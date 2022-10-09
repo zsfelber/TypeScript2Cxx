@@ -537,7 +537,7 @@ export class Emitter {
             const headerName = filePath.replace(/\.ts$/, '_h').replace(/[\\\/\.]/g, '_').toUpperCase();
             this.writer.writeStringNewLine(`#ifndef ${headerName}`);
             this.writer.writeStringNewLine(`#define ${headerName}`);
-            this.writer.writeStringNewLine(`#include "core.h"`);
+            this.writer.writeStringNewLine(`#include "cpplib/core.h"`);
         }
     }
 
@@ -1608,7 +1608,7 @@ export class Emitter {
         if (node.moduleSpecifier.kind === ts.SyntaxKind.StringLiteral) {
             const ident = <ts.StringLiteral>node.moduleSpecifier;
             if (ident.text==".") {
-                this.writer.writeString("index.h");
+                this.writer.writeString("./index.h");
             } else {
                 this.writer.writeString(ident.text);
                 this.writer.writeString('.h');
@@ -1629,7 +1629,7 @@ export class Emitter {
         if (node.moduleSpecifier.kind === ts.SyntaxKind.StringLiteral) {
             const ident = <ts.StringLiteral>node.moduleSpecifier;
             if (ident.text==".") {
-                this.writer.writeString("index.h");
+                this.writer.writeString("./index.h");
             } else {
                 this.writer.writeString(ident.text);
                 this.writer.writeString('.h');
