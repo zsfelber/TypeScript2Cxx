@@ -1761,6 +1761,7 @@ constexpr const T const_(T t) {
         template <typename E>
         struct array_traits<E,std::shared_ptr<typename array_type_helper<E>::array_type_base>>
         {
+            using array_type_base = typename array_type_helper<E>::array_type_base;
             using array_type = typename array_type_helper<E>::array_type;
             using array_type_ref = typename array_type_helper<E>::array_type_ref;
 
@@ -1777,8 +1778,11 @@ constexpr const T const_(T t) {
         };
 
         template <typename E>
-        struct array : array_type_helper<E>
+        struct array
         {
+            using array_type_base = typename array_type_helper<E>::array_type_base;
+            using array_type = typename array_type_helper<E>::array_type;
+            using array_type_ref = typename array_type_helper<E>::array_type_ref;
 
             using array_traits_ = array_traits<E,array_type>;
 
@@ -2151,6 +2155,7 @@ constexpr const T const_(T t) {
         template <typename K, typename V>
         struct object_traits<K, V, std::shared_ptr<typename map_type_helper<K, V>::object_type_base>>
         {
+            using object_type_base = typename map_type_helper<K, V>::object_type_base;
             using object_type = typename map_type_helper<K, V>::object_type;
             using object_type_ref = typename map_type_helper<K, V>::array_type_ref;
 
@@ -2167,9 +2172,14 @@ constexpr const T const_(T t) {
         };
 
         template <typename K, typename V>
-        struct object : map_type_helper<K,V>
+        struct object
         {
+            using object_type_base = typename map_type_helper<K, V>::object_type_base;
+            using object_type = typename map_type_helper<K, V>::object_type;
+            using object_type_ref = typename map_type_helper<K, V>::array_type_ref;
+            using pair = typename map_type_helper<K, V>::pair;
 
+            using object_traits_ = object_traits<K,V,object_type>;
 
             bool isUndefined;
             object_type _values;
@@ -2193,12 +2203,12 @@ constexpr const T const_(T t) {
 
             constexpr object_type_ref get() const
             {
-                return object_traits<object_type>::access(mutable_(_values));
+                return object_traits_::access(mutable_(_values));
             }
 
             constexpr object_type_ref get()
             {
-                return object_traits<object_type>::access(_values);
+                return object_traits_::access(_values);
             }
 
             static ObjectKeys<js::string, object_type_base> keys(const object &);
