@@ -2353,13 +2353,17 @@ export class Emitter {
         let defaultParams = false;
         let next = false;
         node.parameters.forEach((element, index) => {
-            if (element.name.kind !== ts.SyntaxKind.Identifier) {
-                throw new Error('Not implemented');
-            }
-
             if (next) {
                 this.writer.writeString(', ');
             }
+
+            if (element.name.kind !== ts.SyntaxKind.Identifier) {
+                console.log("node parameter kind not implemented : ",element.name.getText()+" : "+ts.SyntaxKind[element.name.kind]);
+                //throw new Error('Not implemented');
+                this.writer.writeString('<not an identifier>');
+                return;
+            }
+
 
             const effectiveType = element.type
                 || this.resolver.getOrResolveTypeOfAsTypeNode(element.initializer);
