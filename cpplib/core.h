@@ -1614,21 +1614,21 @@ constexpr const T const_(T t) {
 
     // function ///////////////////////////////////////////////////////////////////////
     template <typename Rx, typename _Cls, typename... Args>
-    struct _Deduction_MethodPtr<Rx (__thiscall _Cls::*)(Args...) const>
+    struct _Deduction_MethodPtr<Rx (/*__thiscall*/ _Cls::*)(Args...) const>
     {
         using _ReturnType = Rx;
         const static size_t _CountArgs = sizeof...(Args);
     };
 
     template <typename Rx, typename _Cls, typename... Args>
-    struct _Deduction_MethodPtr<Rx (__thiscall _Cls::*)(Args...)>
+    struct _Deduction_MethodPtr<Rx (/*__thiscall*/ _Cls::*)(Args...)>
     {
         using _ReturnType = Rx;
         const static size_t _CountArgs = sizeof...(Args);
     };
 
     template <typename Rx, typename... Args>
-    struct _Deduction_MethodPtr<Rx(__cdecl *)(Args...)>
+    struct _Deduction_MethodPtr<Rx(/*__cdecl*/ *)(Args...)>
     {
         using _ReturnType = Rx;
         const static size_t _CountArgs = sizeof...(Args);
@@ -1728,6 +1728,38 @@ constexpr const T const_(T t) {
 
     namespace tmpl
     {
+        // core.h:1755:23: error: explicit specialization in non-namespace scope ‘struct js::tmpl::array<T>’
+        // 1755 |             template <>
+
+        template <typename array_type, typename array_type_base, typename _Ty>
+        struct array_traits
+        {
+            template <class... _Types>
+            static _Ty create(_Types &&..._Args)
+            {
+                return array_type_base(_Args...);
+            }
+
+            static constexpr _Ty &access(std::remove_reference_t<_Ty> &_Arg)
+            {
+                return (static_cast<_Ty &>(_Arg));
+            }
+        };
+
+        template <typename array_type, typename array_type_base>
+        struct array_traits<array_type, array_type_base, std::shared_ptr<array_type_base>>
+        {
+            template <class... _Types>
+            static inline auto create(_Types &&..._Args)
+            {
+                return std::make_shared<array_type_base>(_Args...);
+            }
+
+            static inline array_type_ref access(array_type &_Arg)
+            {
+                return (static_cast<array_type_ref>(*_Arg));
+            }
+        };
 
         template <typename E>
         struct array
@@ -1737,35 +1769,6 @@ constexpr const T const_(T t) {
             using array_type = std::shared_ptr<array_type_base>; // array_type_base - value type, std::shared_ptr<array_type_base> - reference type
             using array_type_ref = array_type_base &;
 
-            template <typename _Ty>
-            struct array_traits
-            {
-                template <class... _Types>
-                static _Ty create(_Types &&..._Args)
-                {
-                    return array_type_base(_Args...);
-                }
-
-                static constexpr _Ty &access(std::remove_reference_t<_Ty> &_Arg)
-                {
-                    return (static_cast<_Ty &>(_Arg));
-                }
-            };
-
-            template <>
-            struct array_traits<std::shared_ptr<array_type_base>>
-            {
-                template <class... _Types>
-                static inline auto create(_Types &&..._Args)
-                {
-                    return std::make_shared<array_type_base>(_Args...);
-                }
-
-                static inline array_type_ref access(array_type &_Arg)
-                {
-                    return (static_cast<array_type_ref>(*_Arg));
-                }
-            };
 
             bool isUndefined;
             array_type _values;
