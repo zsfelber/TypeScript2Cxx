@@ -1822,8 +1822,14 @@ export class Emitter {
     }
 
     private compareTypes(t1: ts.TypeNode, t2: ts.TypeNode): boolean {
-        const kind1 = t1.kind === ts.SyntaxKind.LiteralType ? (<ts.LiteralTypeNode>t1).literal.kind : t1.kind;
-        const kind2 = t2.kind === ts.SyntaxKind.LiteralType ? (<ts.LiteralTypeNode>t2).literal.kind : t2.kind;
+        let kind1=ts.SyntaxKind.Unknown;
+        if (t1) {
+            kind1 = t1.kind === ts.SyntaxKind.LiteralType ? (<ts.LiteralTypeNode>t1).literal.kind : t1.kind;
+        }
+        let kind2=ts.SyntaxKind.Unknown;
+        if (t2) {
+            kind2 = t2.kind === ts.SyntaxKind.LiteralType ? (<ts.LiteralTypeNode>t2).literal.kind : t2.kind;
+        }
         return kind1 === kind2;
     }
 
