@@ -5,16 +5,32 @@ export class IdentifierResolver {
     public constructor(private typeChecker: ts.TypeChecker) {
     }
 
-    public getFirstDeclaration(typeInfo: ts.Type): ts.Declaration {
-        return  typeInfo && typeInfo.symbol && typeInfo.symbol.declarations[0];
+    public getFirstDeclaration(symbol: ts.Symbol): ts.Declaration {
+        return  symbol && symbol.declarations[0];
     }
 
-    public getValueDeclaration(typeInfo: ts.Type): ts.Declaration {
-        return typeInfo.symbol && typeInfo.symbol.valueDeclaration;
+    public getValueDeclaration(symbol: ts.Symbol): ts.Declaration {
+        return symbol && symbol.valueDeclaration;
+    }
+
+    public getSomeGoodDeclaration(symbol: ts.Symbol): ts.Declaration {
+        return symbol && (this.getValueDeclaration(symbol) || this.getFirstDeclaration(symbol));
+    }
+
+    public getTypeFirstDeclaration(typeInfo: ts.Type): ts.Declaration {
+        return  typeInfo && this.getFirstDeclaration(typeInfo.symbol);
+    }
+
+    public getTypeValueDeclaration(typeInfo: ts.Type): ts.Declaration {
+        return  typeInfo && this.getValueDeclaration(typeInfo.symbol);
+    }
+
+    public getTypeSomeGoodDeclaration(typeInfo: ts.Type): ts.Declaration {
+        return  typeInfo && this.getSomeGoodDeclaration(typeInfo.symbol);
     }
 
     public getValueDeclarationType(typeInfo: ts.Type) {
-        return (<any>this.getValueDeclaration(typeInfo))?.type;
+        return (<any>this.getTypeValueDeclaration(typeInfo))?.type;
     }
 
     public typesAreTheSame(typeReturnIn: ts.TypeNode, functionReturnIn: ts.TypeNode): boolean {
@@ -78,6 +94,8 @@ export class IdentifierResolver {
     public isTypeFromSymbol(node: ts.Node | ts.Type, kind: ts.SyntaxKind) {
         return node
             && (<any>node).symbol
+            && (<any>node).symbol.declarations
+            && (<any>node).symbol.declarations.length
             && (<any>node).symbol.declarations[0].kind === kind;
     }
 

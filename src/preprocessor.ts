@@ -66,7 +66,10 @@ export class Preprocessor {
         if (!type) {
             return node;
         }
-        const baseClassDeclaration = <ts.ClassDeclaration>type.symbol.valueDeclaration;
+        let baseClassDeclaration = <ts.ClassDeclaration>this.resolver.getSomeGoodDeclaration(type.symbol);
+        if (!baseClassDeclaration) {
+            return node;
+        }
 
         const constructors = <ts.ConstructorDeclaration[]>node.members
             .filter(m => m.kind === ts.SyntaxKind.Constructor);

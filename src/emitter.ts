@@ -3661,10 +3661,13 @@ export class Emitter {
 
         const typeInfo = this.resolver.getOrResolveTypeOf(node.expression);
         const symbolInfo = this.resolver.getSymbolAtLocation(node.name);
+
+        let valueDeclaration=this.resolver.getSomeGoodDeclaration(symbolInfo);
+
         const methodAccess = symbolInfo
-            && symbolInfo.valueDeclaration.kind === ts.SyntaxKind.MethodDeclaration
+            && valueDeclaration.kind === ts.SyntaxKind.MethodDeclaration
             && !(node.parent.kind === ts.SyntaxKind.CallExpression && (<ts.CallExpression>node.parent).expression === node);
-        const isStaticMethodAccess = symbolInfo && symbolInfo.valueDeclaration && this.isStatic(symbolInfo.valueDeclaration);
+        const isStaticMethodAccess = symbolInfo && valueDeclaration && this.isStatic(valueDeclaration);
 
         const getAccess = symbolInfo
             && symbolInfo.declarations
@@ -3679,14 +3682,14 @@ export class Emitter {
                 this.processExpression(<ts.Identifier>node.name);
             } else {
                 this.writer.writeString('std::bind(&');
-                const valueDeclaration = <ts.ClassDeclaration>symbolInfo.valueDeclaration.parent;
-                this.processExpression(<ts.Identifier>valueDeclaration.name);
+                const pvalueDeclaration = <ts.ClassDeclaration>valueDeclaration.parent;
+                this.processExpression(<ts.Identifier>pvalueDeclaration.name);
                 this.writer.writeString('::');
                 this.processExpression(<ts.Identifier>node.name);
                 this.writer.writeString(', ');
                 this.processExpression(node.expression);
 
-                const methodDeclaration = <ts.MethodDeclaration>(symbolInfo.valueDeclaration);
+                const methodDeclaration = <ts.MethodDeclaration>(valueDeclaration);
                 methodDeclaration.parameters.forEach((p, i) => {
                     this.writer.writeString(', std::placeholders::_' + (i + 1));
                 });
