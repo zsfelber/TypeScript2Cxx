@@ -1613,8 +1613,12 @@ export class Emitter {
         this.writer.writeString('#include \"');
         if (node.moduleSpecifier.kind === ts.SyntaxKind.StringLiteral) {
             const ident = <ts.StringLiteral>node.moduleSpecifier;
-            this.writer.writeString(ident.text);
-            this.writer.writeString('.h');
+            if (ident.text==".") {
+                this.writer.writeString("index.h");
+            } else {
+                this.writer.writeString(ident.text);
+                this.writer.writeString('.h');
+            }
         }
 
         this.writer.writeStringNewLine('\"');

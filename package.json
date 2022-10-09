@@ -17,7 +17,8 @@
     "lint": "tslint src/**/*.ts -t verbose",
     "build": "tsc -p tsconfig.json",
     "exec": "ts-node src/main.ts",
-    "prepare": "./prepublish_npm.sh"
+    "prepare": "./prepublish_npm.sh",
+    "_install": "npm install"
   },
   "bin": {
     "tsc-cxx": "./__out/main.js"
