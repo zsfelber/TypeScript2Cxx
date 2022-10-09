@@ -1731,24 +1731,39 @@ constexpr const T const_(T t) {
         // core.h:1755:23: error: explicit specialization in non-namespace scope ‘struct js::tmpl::array<T>’
         // 1755 |             template <>
 
-        template <typename array_type, typename array_type_base, typename _Ty>
+        template <typename E>
+        struct array_type_helper
+        {
+            using array_type_base = std::vector<E>;
+            //using array_type = array_type_base; // array_type_base - value type, std::shared_ptr<array_type_base> - reference type
+            using array_type = std::shared_ptr<array_type_base>; // array_type_base - value type, std::shared_ptr<array_type_base> - reference type
+            using array_type_ref = array_type_base &;
+
+        };
+
+        template <typename E, typename array_type>
         struct array_traits
         {
+            using array_type_base = typename array_type_helper<E>::array_type_base;
+
             template <class... _Types>
-            static _Ty create(_Types &&..._Args)
+            static array_type create(_Types &&..._Args)
             {
                 return array_type_base(_Args...);
             }
 
-            static constexpr _Ty &access(std::remove_reference_t<_Ty> &_Arg)
+            static constexpr array_type &access(std::remove_reference_t<array_type> &_Arg)
             {
-                return (static_cast<_Ty &>(_Arg));
+                return (static_cast<array_type &>(_Arg));
             }
         };
 
-        template <typename array_type, typename array_type_base>
-        struct array_traits<array_type, array_type_base, std::shared_ptr<array_type_base>>
+        template <typename E>
+        struct array_traits<E,std::shared_ptr<typename array_type_helper<E>::array_type_base>>
         {
+            using array_type = typename array_type_helper<E>::array_type;
+            using array_type_ref = typename array_type_helper<E>::array_type_ref;
+
             template <class... _Types>
             static inline auto create(_Types &&..._Args)
             {
@@ -1762,18 +1777,16 @@ constexpr const T const_(T t) {
         };
 
         template <typename E>
-        struct array
+        struct array : array_type_helper<E>
         {
-            using array_type_base = std::vector<E>;
-            //using array_type = array_type_base; // array_type_base - value type, std::shared_ptr<array_type_base> - reference type
-            using array_type = std::shared_ptr<array_type_base>; // array_type_base - value type, std::shared_ptr<array_type_base> - reference type
-            using array_type_ref = array_type_base &;
+
+            using array_traits_ = array_traits<E,array_type>;
 
 
             bool isUndefined;
             array_type _values;
 
-            array() : _values(array_traits<array_type>::create()), isUndefined(false)
+            array() : _values(array_traits_::create()), isUndefined(false)
             {
             }
 
@@ -1781,15 +1794,15 @@ constexpr const T const_(T t) {
             {
             }
 
-            array(std::initializer_list<E> values) : _values(array_traits<array_type>::create(values)), isUndefined(false)
+            array(std::initializer_list<E> values) : _values(array_traits_::create(values)), isUndefined(false)
             {
             }
 
-            array(std::vector<E> values) : _values(array_traits<array_type>::create(values)), isUndefined(false)
+            array(std::vector<E> values) : _values(array_traits_::create(values)), isUndefined(false)
             {
             }
 
-            array(const undefined_t &undef) : _values(array_traits<array_type>::create()), isUndefined(true)
+            array(const undefined_t &undef) : _values(array_traits_::create()), isUndefined(true)
             {
             }
 
@@ -1805,12 +1818,12 @@ constexpr const T const_(T t) {
 
             constexpr array_type_ref get() const
             {
-                return array_traits<array_type>::access(mutable_(_values));
+                return array_traits_::access(mutable_(_values));
             }
 
             constexpr array_type_ref get()
             {
-                return array_traits<array_type>::access(_values);
+                return array_traits_::access(_values);
             }
 
             size_t get_length()
@@ -2085,9 +2098,11 @@ constexpr const T const_(T t) {
 
     namespace tmpl
     {
+        // core.h:2138:23: error: explicit specialization in non-namespace scope ‘struct js::tmpl::object<K, V>’
+        // 2138 |             template <>
 
         template <typename K, typename V>
-        struct object
+        struct map_type_helper
         {
             struct K_hash
             {
@@ -2114,35 +2129,47 @@ constexpr const T const_(T t) {
             using object_type_ref = object_type_base &;
             using pair = std::pair<const K, V>;
 
-            template <typename _Ty>
-            struct object_traits
+        };
+
+        template <typename K, typename V, typename object_type>
+        struct object_traits
+        {
+            using object_type_base = typename map_type_helper<K, V>::object_type_base;
+
+            template <class... _Types>
+            static object_type create(_Types &&..._Args)
             {
-                template <class... _Types>
-                static _Ty create(_Types &&..._Args)
-                {
-                    return object_type_base(_Args...);
-                }
+                return object_type_base(_Args...);
+            }
 
-                static constexpr _Ty &access(std::remove_reference_t<_Ty> &_Arg)
-                {
-                    return (static_cast<_Ty &>(_Arg));
-                }
-            };
-
-            template <>
-            struct object_traits<std::shared_ptr<object_type_base>>
+            static constexpr object_type &access(std::remove_reference_t<object_type> &_Arg)
             {
-                template <class... _Types>
-                static inline auto create(_Types &&..._Args)
-                {
-                    return std::make_shared<object_type_base>(_Args...);
-                }
+                return (static_cast<object_type &>(_Arg));
+            }
+        };
 
-                static inline object_type_ref access(object_type &_Arg)
-                {
-                    return (static_cast<object_type_ref>(*_Arg));
-                }
-            };
+        template <typename K, typename V>
+        struct object_traits<K, V, std::shared_ptr<typename map_type_helper<K, V>::object_type_base>>
+        {
+            using object_type = typename map_type_helper<K, V>::object_type;
+            using object_type_ref = typename map_type_helper<K, V>::array_type_ref;
+
+            template <class... _Types>
+            static inline auto create(_Types &&..._Args)
+            {
+                return std::make_shared<object_type_base>(_Args...);
+            }
+
+            static inline object_type_ref access(object_type &_Arg)
+            {
+                return (static_cast<object_type_ref>(*_Arg));
+            }
+        };
+
+        template <typename K, typename V>
+        struct object : map_type_helper<K,V>
+        {
+
 
             bool isUndefined;
             object_type _values;
