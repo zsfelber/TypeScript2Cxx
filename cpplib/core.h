@@ -2176,7 +2176,7 @@ constexpr const T const_(T t) {
         {
             using object_type_base = typename map_type_helper<K, V>::object_type_base;
             using object_type = typename map_type_helper<K, V>::object_type;
-            using object_type_ref = typename map_type_helper<K, V>::array_type_ref;
+            using object_type_ref = typename map_type_helper<K, V>::object_type_ref;
             using pair = typename map_type_helper<K, V>::pair;
 
             using object_traits_ = object_traits<K,V,object_type>;
@@ -2420,7 +2420,7 @@ constexpr const T const_(T t) {
         }
 
         template <typename Rx, typename... Args>
-        any(Rx(__cdecl *value)(Args...)) : _value(std::shared_ptr<js::function>((js::function *)new js::function_t<Rx(__cdecl *)(Args...), Rx(__cdecl *)(Args...)>(value)))
+        any(Rx(/*__cdecl*/ *value)(Args...)) : _value(std::shared_ptr<js::function>((js::function *)new js::function_t<Rx(/*__cdecl*/ *)(Args...), Rx(/*__cdecl*/ *)(Args...)>(value)))
         {
         }
 
@@ -3861,7 +3861,7 @@ constexpr const T const_(T t) {
 
         // Object
         template <typename K, typename V>
-        object<K, V>::object() : _values(object<K, V>::object_traits<object<K, V>::object_type>::create()), isUndefined(false)
+        object<K, V>::object() : _values(object_traits<K, V,typename object<K, V>::object_type>::create()), isUndefined(false)
         {
         }
 
@@ -3871,7 +3871,7 @@ constexpr const T const_(T t) {
         }
 
         template <typename K, typename V>
-        object<K, V>::object(std::initializer_list<pair> values) : _values(object<K, V>::object_traits<object<K, V>::object_type>::create(values)), isUndefined(false)
+        object<K, V>::object(std::initializer_list<pair> values) : _values(object_traits<K, V,typename object<K, V>::object_type>::create(values)), isUndefined(false)
         {
             auto &ref = get();
             for (auto &item : values)
@@ -3881,7 +3881,7 @@ constexpr const T const_(T t) {
         }
 
         template <typename K, typename V>
-        object<K, V>::object(const undefined_t &) : _values(object<K, V>::object_traits<object<K, V>::object_type>::create()), isUndefined(true)
+        object<K, V>::object(const undefined_t &) : _values(object_traits<K, V,typename object<K, V>::object_type>::create()), isUndefined(true)
         {
         }
 
