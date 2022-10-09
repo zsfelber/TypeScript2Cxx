@@ -63,6 +63,9 @@ export class Preprocessor {
 
         const firstType = inheritance[0].types[0];
         const type = this.resolver.getOrResolveTypeOf(firstType.expression);
+        if (!type) {
+            return node;
+        }
         const baseClassDeclaration = <ts.ClassDeclaration>type.symbol.valueDeclaration;
 
         const constructors = <ts.ConstructorDeclaration[]>node.members
