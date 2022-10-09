@@ -2246,7 +2246,7 @@ constexpr const T const_(T t) {
 
             void Delete(js::number field)
             {
-                get().erase(field.operator std::string &());
+                get().erase(field.operator std::string /*&*/());
             }
 
             void Delete(js::string field)
@@ -2256,7 +2256,7 @@ constexpr const T const_(T t) {
 
             void Delete(js::any field)
             {
-                get().erase(field.operator std::string &());
+                get().erase(field.operator std::string /*&*/());
             }
 
             void Delete(js::undefined_t)
