@@ -188,7 +188,8 @@ export class Emitter {
 
     private isImportStatement(f: ts.Statement | ts.Declaration): boolean {
         if (f.kind === ts.SyntaxKind.ImportDeclaration
-            || f.kind === ts.SyntaxKind.ImportEqualsDeclaration) {
+            || f.kind === ts.SyntaxKind.ImportEqualsDeclaration
+            || f.kind === ts.SyntaxKind.ExportDeclaration) {
             return true;
         }
 
@@ -578,7 +579,8 @@ export class Emitter {
             case ts.SyntaxKind.EnumDeclaration: this.processEnumDeclaration(<ts.EnumDeclaration>node); return;
             case ts.SyntaxKind.ClassDeclaration: this.processClassDeclaration(<ts.ClassDeclaration>node); return;
             case ts.SyntaxKind.InterfaceDeclaration: this.processClassDeclaration(<ts.InterfaceDeclaration>node); return;
-            case ts.SyntaxKind.ExportDeclaration: this.processExportDeclaration(<ts.ExportDeclaration>node); return;
+            case ts.SyntaxKind.ExportDeclaration: 
+                /*done in forward declaration*/ /*this.processExportDeclaration(<ts.ExportDeclaration>node);*/ return;
             case ts.SyntaxKind.ModuleDeclaration: this.processModuleDeclaration(<ts.ModuleDeclaration>node); return;
             case ts.SyntaxKind.NamespaceExportDeclaration: this.processNamespaceDeclaration(<ts.NamespaceDeclaration>node); return;
             case ts.SyntaxKind.LabeledStatement: this.processLabeledStatement(<ts.LabeledStatement>node); return;
@@ -677,6 +679,7 @@ export class Emitter {
         switch (node.kind) {
             case ts.SyntaxKind.TypeAliasDeclaration: this.processTypeAliasDeclaration(<ts.TypeAliasDeclaration>node); return;
             case ts.SyntaxKind.ImportDeclaration: this.processImportDeclaration(<ts.ImportDeclaration>node); return;
+            case ts.SyntaxKind.ExportDeclaration: this.processExportDeclaration(<ts.ExportDeclaration>node); return;
             default:
                 return;
         }
@@ -1601,7 +1604,19 @@ export class Emitter {
     }
 
     private processExportDeclaration(node: ts.ExportDeclaration): void {
-        /* TODO: */
+        this.writer.writeString('#include \"');
+        if (node.moduleSpecifier.kind === ts.SyntaxKind.StringLiteral) {
+            const ident = <ts.StringLiteral>node.moduleSpecifier;
+            if (ident.text==".") {
+                this.writer.writeString("index.h");
+            } else {
+                this.writer.writeString(ident.text);
+                this.writer.writeString('.h');
+            }
+        }
+
+        this.writer.writeStringNewLine('\"');
+        /* TODO: ?*/
     }
 
     private processImportDeclaration(node: ts.ImportDeclaration): void {
