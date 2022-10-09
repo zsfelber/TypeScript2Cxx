@@ -348,11 +348,11 @@ constexpr const T const_(T t) {
         requires ArithmeticOrEnum<N>
         bool operator!=(N n) const;
 
-        template <typename N = void>
+        template <typename N/* = void*/>
         requires ArithmeticOrEnum<N>
         friend bool operator==(N n, const undefined_t &u);
 
-        template <typename N = void>
+        template <typename N/* = void*/>
         requires ArithmeticOrEnum<N>
         friend bool operator!=(N n, const undefined_t &u);
 
@@ -434,23 +434,23 @@ constexpr const T const_(T t) {
                 return static_cast<void *>(_ptr);
             }
 
-            template <typename T>
-            constexpr operator std::shared_ptr<T>()
+            template <typename T2>
+            constexpr operator std::shared_ptr<T2>()
             {
-                return std::shared_ptr<T>(static_cast<T *>(_ptr));
+                return std::shared_ptr<T2>(static_cast<T2 *>(_ptr));
             }
 
-            template <typename T>
-            constexpr operator const T *()
+            template <typename T2>
+            constexpr operator const T2 *()
             {
-                return isUndefined ? static_cast<const T *>(nullptr) : static_cast<const T *>(_ptr);
+                return isUndefined ? static_cast<const T2 *>(nullptr) : static_cast<const T2 *>(_ptr);
             }
 
-            template <typename T = void>
-            requires ArithmeticOrEnum<T>
-            constexpr operator T()
+            template <typename T2 = void>
+            requires ArithmeticOrEnum<T2>
+            constexpr operator T2()
             {
-                return static_cast<T>(reinterpret_cast<intptr_t>(_ptr));
+                return static_cast<T2>(reinterpret_cast<intptr_t>(_ptr));
             }
 
             operator tstring() const
@@ -1197,14 +1197,14 @@ constexpr const T const_(T t) {
         return true;
     }
 
-    template <typename N>
+    template <typename N/*=void*/>
     requires ArithmeticOrEnum<N>
     bool operator==(N n, const undefined_t &u)
     {
         return false;
     }
 
-    template <typename N>
+    template <typename N/*=void*/>
     requires ArithmeticOrEnum<N>
     bool operator!=(N n, const undefined_t &u)
     {
