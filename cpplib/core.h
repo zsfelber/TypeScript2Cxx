@@ -2254,10 +2254,7 @@ constexpr const T const_(T t) {
                 get().erase(field.operator std::string &());
             }
 
-            void Delete(js::any field)
-            {
-                get().erase(field.operator std::string /*&*/());
-            }
+            void Delete(js::any field);
 
             void Delete(js::undefined_t)
             {
@@ -2463,7 +2460,7 @@ constexpr const T const_(T t) {
             return std::dynamic_pointer_cast<T>(std::get<std::shared_ptr<js::object>>(_value));
         }
 
-        inline const js::boolean &boolean_ref_const() const
+        inline const js::boolean &boolean_ref() const
         {
             return get<js::boolean>();
         }
@@ -2473,7 +2470,7 @@ constexpr const T const_(T t) {
             return get<js::boolean>();
         }
 
-        inline const js::number &number_ref_const() const
+        inline const js::number &number_ref() const
         {
             return get<js::number>();
         }
@@ -2483,7 +2480,7 @@ constexpr const T const_(T t) {
             return get<js::number>();
         }
 
-        inline const js::string &string_ref_const() const
+        inline const js::string &string_ref() const
         {
             return get<js::string>();
         }
@@ -2498,7 +2495,12 @@ constexpr const T const_(T t) {
             return get<std::shared_ptr<function>>();
         }
 
-        inline const array_any &array_ref_const() const
+        inline std::shared_ptr<function> function_ptr() const
+        {
+            return get<std::shared_ptr<function>>();
+        }
+
+        inline const array_any &array_ref() const
         {
             return get<array_any>();
         }
@@ -2508,7 +2510,7 @@ constexpr const T const_(T t) {
             return get<array_any>();
         }
 
-        inline const object &object_ref_const() const
+        inline const object &object_ref() const
         {
             return get<object>();
         }
@@ -2518,7 +2520,7 @@ constexpr const T const_(T t) {
             return get<object>();
         }
 
-        inline const std::shared_ptr<js::object> &class_ref_const() const
+        inline const std::shared_ptr<js::object> &class_ref() const
         {
             return get<std::shared_ptr<js::object>>();
         }
@@ -2783,13 +2785,13 @@ constexpr const T const_(T t) {
             case anyTypeId::undefined_type:
                 return true;
             case anyTypeId::boolean_type:
-                return boolean_ref_const() == mutable_(other).boolean_ref_const();
+                return boolean_ref() == mutable_(other).boolean_ref();
             case anyTypeId::number_type:
-                return number_ref_const() == mutable_(other).number_ref_const();
+                return number_ref() == mutable_(other).number_ref();
             case anyTypeId::string_type:
-                return string_ref_const() == mutable_(other).string_ref_const();
+                return string_ref() == mutable_(other).string_ref();
             case anyTypeId::object_type:
-                return object_ref_const() == mutable_(other).object_ref_const();
+                return object_ref() == mutable_(other).object_ref();
             }
 
             throw "not implemented";
@@ -2819,7 +2821,7 @@ constexpr const T const_(T t) {
             case anyTypeId::number_type:
                 return false;
             case anyTypeId::string_type:
-                return string_ref_const().is_null() && other._ptr == nullptr;
+                return string_ref().is_null() && other._ptr == nullptr;
             case anyTypeId::object_type:
             case anyTypeId::class_type:
             case anyTypeId::pointer_type:
@@ -3490,15 +3492,15 @@ constexpr const T const_(T t) {
                 break;
 
             case anyTypeId::boolean_type:
-                h2 = std::hash<bool>{}(static_cast<bool>(mutable_(boolean_ref_const())));
+                h2 = std::hash<bool>{}(static_cast<bool>(mutable_(boolean_ref())));
                 break;
 
             case anyTypeId::number_type:
-                h2 = std::hash<double>{}(static_cast<double>(mutable_(number_ref_const())));
+                h2 = std::hash<double>{}(static_cast<double>(mutable_(number_ref())));
                 break;
 
             case anyTypeId::string_type:
-                h2 = std::hash<tstring>{}(static_cast<tstring &>(mutable_(string_ref_const())));
+                h2 = std::hash<tstring>{}(static_cast<tstring &>(mutable_(string_ref())));
                 break;
 
             default:
@@ -3545,6 +3547,7 @@ constexpr const T const_(T t) {
         }
     };
 
+    
     template <typename... Args>
     auto function::operator()(Args... args)
     {
@@ -3884,6 +3887,13 @@ constexpr const T const_(T t) {
         object<K, V>::object(const undefined_t &) : _values(object_traits<K, V,typename object<K, V>::object_type>::create()), isUndefined(true)
         {
         }
+
+        template <typename K, typename V>
+        void object<K, V>::Delete(js::any field)
+        {
+            get().erase(field.operator std::string /*&*/());
+        }
+
 
         template <typename K, typename V>
         ObjectKeys<js::string, typename object<K, V>::object_type_base> object<K, V>::keys(const object<K, V> &obj)
