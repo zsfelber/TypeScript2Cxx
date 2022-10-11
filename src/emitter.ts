@@ -3069,7 +3069,8 @@ export class Emitter {
         if (text === '') {
             this.writer.writeString(`string_empty`);
         } else {
-            this.writer.writeString(`STR("${text}")`);
+            let esctext = JSON.stringify(text).slice(1, -1);
+            this.writer.writeString(`STR("${esctext}")`);
         }
     }
 
