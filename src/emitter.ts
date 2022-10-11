@@ -1935,8 +1935,8 @@ export class Emitter {
                 const typeInfo = this.resolver.getOrResolveTypeOf(type);
                 const isTypeAlias = ((typeInfo && this.resolver.checkTypeAlias(typeInfo.aliasSymbol))
                     || this.resolver.isTypeAlias((<any>type).typeName)) && !this.resolver.isThisType(typeInfo);
-                const isReadonly = typeReference && typeReference.typeArguments && typeReference.typeArguments.length && typeReference.typeName.getText()=="Readonly";
-
+                const isReadonly = typeReference && typeReference.typeArguments && typeReference.typeArguments.length && 
+                    typeReference.typeName && typeReference.typeName.getSourceFile() && typeReference.typeName.getText()=="Readonly";
                 // detect if pointer
                 const isEnum = this.isEnum(typeReference);
                 const isArray = this.resolver.isArrayType(typeInfo);
