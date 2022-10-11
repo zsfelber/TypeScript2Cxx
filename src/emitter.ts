@@ -1935,6 +1935,7 @@ export class Emitter {
                 const typeInfo = this.resolver.getOrResolveTypeOf(type);
                 const isTypeAlias = ((typeInfo && this.resolver.checkTypeAlias(typeInfo.aliasSymbol))
                     || this.resolver.isTypeAlias((<any>type).typeName)) && !this.resolver.isThisType(typeInfo);
+                const isReadonly = typeReference && typeReference.typeArguments && typeReference.typeArguments.length && typeReference.typeName.getText()=="Readonly";
 
                 // detect if pointer
                 const isEnum = this.isEnum(typeReference);
@@ -1951,7 +1952,8 @@ export class Emitter {
                     || isEnum
                     || skipPointerInType
                     || isTypeAlias
-                    || isArray;
+                    || isArray
+                    || isReadonly;
 
                 if (!skipPointerIf) {
                     this.writer.writeString('std::shared_ptr<');
@@ -1991,11 +1993,18 @@ export class Emitter {
 
                 if (isArray) {
                     this.writer.writeString('array');
+                } else if (isReadonly) {
+                    this.writer.writeString('const ');
                 } else {
                     this.writeTypeName(typeReference);
                 }
 
-                if (typeReference.typeArguments) {
+                if (isReadonly) {
+                    const element = typeReference.typeArguments[0];
+
+                    this.processType(element, false);
+
+                } else if (typeReference.typeArguments) {
                     this.writer.writeString('<');
 
                     let next1 = false;
