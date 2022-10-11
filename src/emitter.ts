@@ -248,6 +248,8 @@ export class Emitter {
                     || node.kind === ts.SyntaxKind.MethodDeclaration
                     || node.kind === ts.SyntaxKind.FunctionExpression
                     || node.kind === ts.SyntaxKind.FunctionType
+                    || node.kind === ts.SyntaxKind.ConstructorType
+                    
                     || node.kind === ts.SyntaxKind.ClassDeclaration
                     || node.kind === ts.SyntaxKind.ClassExpression) {
                     return;
@@ -744,6 +746,11 @@ export class Emitter {
         }
 
         if (effectiveType.kind === ts.SyntaxKind.FunctionType
+            && this.resolver.isTypeParameter(effectiveType.type)) {
+            return true;
+        }
+
+        if (effectiveType.kind === ts.SyntaxKind.ConstructorType
             && this.resolver.isTypeParameter(effectiveType.type)) {
             return true;
         }
@@ -1810,6 +1817,7 @@ export class Emitter {
 
                 break;
             case ts.SyntaxKind.FunctionType:
+            case ts.SyntaxKind.ConstructorType:
                 const functionType = <ts.FunctionTypeNode>type;
                 this.processPredefineType(functionType.type);
                 if (functionType.parameters) {
@@ -2031,6 +2039,8 @@ export class Emitter {
 
                 break;
             case ts.SyntaxKind.FunctionType:
+            case ts.SyntaxKind.ConstructorType:
+
                 const functionType = <ts.FunctionTypeNode>type;
                 this.writer.writeString('std::function<');
                 this.processType(functionType.type);
@@ -2412,6 +2422,7 @@ export class Emitter {
                 } else if (element.questionToken || defaultParams) {
                     switch (element.type && element.type.kind) {
                         case ts.SyntaxKind.FunctionType:
+                        case ts.SyntaxKind.ConstructorType:
                             this.writer.writeString(' = nullptr');
                             break;
                         default:
@@ -2711,6 +2722,8 @@ export class Emitter {
         let functionReturn = functionDeclaration.type || this.resolver.getOrResolveTypeOfAsTypeNode(functionDeclaration);
         if (!functionReturn) {
         } else if (functionReturn.kind === ts.SyntaxKind.FunctionType) {
+            functionReturn = (<ts.FunctionTypeNode>functionReturn).type;
+        } else if (functionReturn.kind === ts.SyntaxKind.ConstructorType) {
             functionReturn = (<ts.FunctionTypeNode>functionReturn).type;
         } else if (!functionDeclaration.type) {
             // if it is not function then use "any"
