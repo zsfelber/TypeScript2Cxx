@@ -2335,11 +2335,12 @@ export class Emitter {
             }
 
             if (inferredTp) {
-                const typeInfo = this.resolver.getTypeOf(inferredTp);
+                //let typeInfo:ts.Type;
+                //typeInfo = this.typeChecker.getTypeFromTypeNode(inferredTp);
+                //!this.resolver.isAnyLikeType(typeInfo)
 
-                if (!this.resolver.isAnyLikeType(typeInfo) && 
-                        this.isTemplateType(inferredTp)) {
-                    return ('RET');
+                if (node.type && this.isTemplateType(inferredTp)) {
+                    return (ts.SyntaxKind[inferredTp.kind]);
                 } else {
                     let ow = this.writer;
                     try {
