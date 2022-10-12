@@ -4,10 +4,24 @@ import { Helpers } from './helpers';
 import { Preprocessor } from './preprocessor';
 import { CodeWriter } from './codewriter';
 
+class ReturnStatement {
+
+    returnStatement: ts.ReturnStatement;
+
+    constructor(s:ts.ReturnStatement) {
+        this.returnStatement = s;
+    }
+    hasValue():boolean {
+        return !!this.returnStatement.expression;
+    }
+}
+
 export class Emitter {
     public writer: CodeWriter;
     private resolver: IdentifierResolver;
     private preprocessor: Preprocessor;
+    private typeChecker: ts.TypeChecker;
+    private sourceFile: ts.SourceFile;
     private sourceFileName: string;
     private scope: Array<ts.Node> = new Array<ts.Node>();
     private opsMap: Map<number, string> = new Map<number, string>();
@@ -19,6 +33,7 @@ export class Emitter {
         private cmdLineOptions: any, private singleModule: boolean, private rootFolder?: string) {
 
         this.writer = new CodeWriter();
+        this.typeChecker = typeChecker;
         this.resolver = new IdentifierResolver(typeChecker);
         this.preprocessor = new Preprocessor(this.resolver, this);
 
@@ -264,27 +279,13 @@ export class Emitter {
         ts.forEachChild(location, checkChild);
     }
 
-    private hasReturn(location: ts.Node): boolean {
-        let hasReturnResult = false;
-        this.childrenVisitor(location, (node: ts.Node) => {
-            if (node.kind === ts.SyntaxKind.ReturnStatement) {
-                hasReturnResult = true;
-                return true;
-            }
-
-            return false;
-        });
-
-        return hasReturnResult;
-    }
-
-    private hasReturnWithValue(location: ts.Node): boolean {
-        let hasReturnResult = false;
+    private extractReturnInfo(location: ts.Node): ReturnStatement {
+        let hasReturnResult:ReturnStatement = null;
         this.childrenVisitor(location, (node: ts.Node) => {
             if (node.kind === ts.SyntaxKind.ReturnStatement) {
                 const returnStatement = <ts.ReturnStatement>node;
-                if (returnStatement.expression) {
-                    hasReturnResult = true;
+                hasReturnResult = new ReturnStatement(returnStatement);
+                if (hasReturnResult.hasValue()) {
                     return true;
                 }
             }
@@ -411,6 +412,7 @@ export class Emitter {
     private processFileInternal(sourceFile: ts.SourceFile): void {
         this.fixupParentReferences(sourceFile);
 
+        this.sourceFile = sourceFile;
         this.sourceFileName = sourceFile.fileName;
 
 
@@ -2268,8 +2270,9 @@ export class Emitter {
             return true;
         }
 
-        const noReturnStatement = !this.hasReturn(node);
-        const noReturn = !this.hasReturnWithValue(node);
+        const r = this.extractReturnInfo(node);
+        const noReturnStatement = !r;
+        const noReturn = !r || !r.hasValue();
         // const noParams = node.parameters.length === 0 && !this.hasArguments(node);
         // const noCapture = !this.requireCapture(node);
 
@@ -2299,21 +2302,38 @@ export class Emitter {
             this.processModifiers(node.modifiers);
         }
 
-        const writeReturnType = () => {
-            if (node.type) {
-                if (this.isTemplateType(node.type)) {
-                    this.writer.writeString('RET');
+        const findReturnType = (evenVoid:boolean) => {
+            let inferredTp = node.type;
+            if (!inferredTp && r && r.hasValue()) {
+                inferredTp = 
+                    this.resolver.getOrResolveTypeOfAsTypeNode(r.returnStatement.expression);
+                if (!inferredTp) {
+                    console.log("Could not infer return type way 1:"+node.getText());
+                }
+            }
+            if (!inferredTp) {
+                let sign = this.typeChecker.getSignatureFromDeclaration(node);
+                let typeNoNode = this.typeChecker.getReturnTypeOfSignature(sign);
+                inferredTp = this.typeChecker.typeToTypeNode(typeNoNode);
+                if (!inferredTp) {
+                    console.log("Could not infer return type way 2:"+node.getText());
+                }
+            }
+
+            if (inferredTp) {
+                if (this.isTemplateType(inferredTp)) {
+                    return ('RET');
                 } else {
-                    this.processType(node.type);
+                    this.processType(inferredTp);
                 }
             } else {
                 if (noReturn) {
-                    this.writer.writeString('void');
+                    return (evenVoid?'void':null);
                 } else {
                     if (isClassMember && (<ts.Identifier>node.name).text === 'toString') {
-                        this.writer.writeString('string');
+                        return ('string');
                     } else {
-                        this.writer.writeString('any');
+                        return ('any');
                     }
                 }
             }
@@ -2331,7 +2351,7 @@ export class Emitter {
                         this.writer.writeString('virtual ');
                     }
 
-                    writeReturnType();
+                    this.writer.writeString(findReturnType(true));
 
                     this.writer.writeString(' ');
                 }
@@ -2536,11 +2556,14 @@ export class Emitter {
             });
 
             // add default return if no body
-            if (noReturnStatement && node && node.type && node.type.kind !== ts.SyntaxKind.VoidKeyword) {
-                this.writer.writeString('return ');
-                writeReturnType();
-                this.writer.writeString('()');
-                this.writer.EndOfStatement();
+            if (noReturnStatement && (!node.type || node.type.kind !== ts.SyntaxKind.VoidKeyword)) {
+                let rs = findReturnType(false);
+                if (rs) {
+                    this.writer.writeString('return ');
+                    this.writer.writeString(rs);
+                    this.writer.writeString('()');
+                    this.writer.EndOfStatement();
+                }
             }
 
             this.writer.EndBlock();
