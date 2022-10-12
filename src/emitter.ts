@@ -2335,7 +2335,10 @@ export class Emitter {
             }
 
             if (inferredTp) {
-                if (this.isTemplateType(inferredTp)) {
+                const typeInfo = this.resolver.getTypeOf(inferredTp);
+
+                if (!this.resolver.isAnyLikeType(typeInfo) && 
+                        this.isTemplateType(inferredTp)) {
                     return ('RET');
                 } else {
                     let ow = this.writer;
