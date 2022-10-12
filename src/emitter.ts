@@ -2302,21 +2302,35 @@ export class Emitter {
             this.processModifiers(node.modifiers);
         }
 
-        const findReturnType = (evenVoid:boolean) => {
+        const findReturnType = () => {
             let inferredTp = node.type;
-            if (!inferredTp && r && r.hasValue()) {
+            /*if (!inferredTp && r && r.hasValue()) {
                 inferredTp = 
                     this.resolver.getOrResolveTypeOfAsTypeNode(r.returnStatement.expression);
                 if (!inferredTp) {
-                    console.log("Could not infer return type way 1:"+node.getText());
+                    console.log("Could not infer return type way 1:"+node.getText()+"  ->  "+r.returnStatement.expression.getText());
                 }
-            }
+            }*/
             if (!inferredTp) {
                 let sign = this.typeChecker.getSignatureFromDeclaration(node);
-                let typeNoNode = this.typeChecker.getReturnTypeOfSignature(sign);
-                inferredTp = this.typeChecker.typeToTypeNode(typeNoNode);
-                if (!inferredTp) {
-                    console.log("Could not infer return type way 2:"+node.getText());
+                if (sign) {
+                    let typeNoNode = this.typeChecker.getReturnTypeOfSignature(sign);
+                    inferredTp = this.typeChecker.typeToTypeNode(typeNoNode);
+                    if (!inferredTp) {
+                        console.log("Could not infer return type:" + 
+                        (node.name ? 
+                        node.name.getText() : "noname : ")
+                        +
+                        (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
+                        );
+                        }
+                } else {
+                    console.log("Could not get signature metadata so infer return type:" + 
+                    (node.name ? 
+                    node.name.getText() : "noname : ")
+                    +
+                    (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
+                    );
                 }
             }
 
@@ -2324,11 +2338,18 @@ export class Emitter {
                 if (this.isTemplateType(inferredTp)) {
                     return ('RET');
                 } else {
-                    this.processType(inferredTp);
+                    let ow = this.writer;
+                    try {
+                        this.writer = new CodeWriter();
+                        this.processType(inferredTp);
+                        return this.writer.getText();
+                    } finally {
+                        this.writer = ow;
+                    }
                 }
             } else {
                 if (noReturn) {
-                    return (evenVoid?'void':null);
+                    return 'void';
                 } else {
                     if (isClassMember && (<ts.Identifier>node.name).text === 'toString') {
                         return ('string');
@@ -2338,6 +2359,7 @@ export class Emitter {
                 }
             }
         };
+        let inferredReturnType = findReturnType();
 
         if (writeAsLambdaCFunction) {
             if (isFunctionOrMethodDeclaration) {
@@ -2351,7 +2373,7 @@ export class Emitter {
                         this.writer.writeString('virtual ');
                     }
 
-                    this.writer.writeString(findReturnType(true));
+                    this.writer.writeString(inferredReturnType);
 
                     this.writer.writeString(' ');
                 }
@@ -2556,14 +2578,11 @@ export class Emitter {
             });
 
             // add default return if no body
-            if (noReturnStatement && (!node.type || node.type.kind !== ts.SyntaxKind.VoidKeyword)) {
-                let rs = findReturnType(false);
-                if (rs) {
-                    this.writer.writeString('return ');
-                    this.writer.writeString(rs);
-                    this.writer.writeString('()');
-                    this.writer.EndOfStatement();
-                }
+            if (noReturnStatement && inferredReturnType != 'void') {
+                this.writer.writeString('return ');
+                this.writer.writeString(inferredReturnType);
+                this.writer.writeString('()');
+                this.writer.EndOfStatement();
             }
 
             this.writer.EndBlock();
