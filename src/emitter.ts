@@ -2578,7 +2578,7 @@ export class Emitter {
             });
 
             // add default return if no body
-            if (noReturnStatement && inferredReturnType != 'void') {
+            if (node.kind !== ts.SyntaxKind.Constructor && noReturnStatement && inferredReturnType != 'void') {
                 this.writer.writeString('return ');
                 this.writer.writeString(inferredReturnType);
                 this.writer.writeString('()');
