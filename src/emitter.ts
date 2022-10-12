@@ -2302,6 +2302,70 @@ export class Emitter {
             this.processModifiers(node.modifiers);
         }
 
+
+        const tsTypeToCsingle = (type0: ts.Type) => {
+            let tp = this.typeChecker.typeToString(type0);
+
+            switch (tp) {
+                case "true":
+                case "false":
+                case "boolean":
+                    return "boolean";
+                default:
+                    if (/[+-]?\d+/.test(tp)) {
+                        return "int";
+                    } else if (/[+-]?\d*[.]\d+/.test(tp)) {
+                        return "double";
+                    } else if (/[+-]?\d*[.]?\d+[eE][+-]?\d+/.test(tp)) {
+                        return "double";
+                    } else {
+                        return null;
+                    }
+            }
+        };
+
+        const tsTypeToC = (tp: ts.Type) => {
+
+            var chs = {
+                "boolean":1,
+                "int":2,
+                "double":3,
+            };
+            var maxch=0;
+            var minch="z";
+            var utp;
+            var itp;
+            if (tp.isUnionOrIntersection() && tp.types) {
+                
+                tp.types.some(cht => {
+                    let tp = tsTypeToCsingle(cht);
+
+                    if (tp && chs[tp]) {
+                        if (chs[tp]>maxch) {
+                            maxch = chs[tp];
+                            utp = tp;
+                        }
+                        if (chs[tp]<minch) {
+                            minch = chs[tp];
+                            itp = tp;
+                        }
+                    } else {
+                        utp = null;
+                        return true;
+                    }
+                    return false;
+                });
+            }
+            if (tp.isUnion()) {
+                return utp;
+            } else if (tp.isIntersection()) {
+                return itp;
+            } else {
+                let rtp = tsTypeToCsingle(tp);
+                return rtp;
+            }
+        };
+
         const findReturnType = () => {
             let inferredTp = node.type;
             /*if (!inferredTp && r && r.hasValue()) {
@@ -2342,13 +2406,19 @@ export class Emitter {
                 if (node.type && this.isTemplateType(inferredTp)) {
                     return (ts.SyntaxKind[inferredTp.kind]);
                 } else {
-                    let ow = this.writer;
-                    try {
-                        this.writer = new CodeWriter();
-                        this.processType(inferredTp);
-                        return this.writer.getText();
-                    } finally {
-                        this.writer = ow;
+                    let tp = this.typeChecker.getTypeFromTypeNode(inferredTp);
+                    let r0 = tsTypeToC(tp);
+                    if (r0) {
+                        return r0;
+                    } else {
+                        let ow = this.writer;
+                        try {
+                            this.writer = new CodeWriter();
+                            this.processType(inferredTp);
+                            return this.writer.getText();
+                        } finally {
+                            this.writer = ow;
+                        }
                     }
                 }
             } else {
