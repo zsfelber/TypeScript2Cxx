@@ -2310,50 +2310,45 @@ export class Emitter {
                 case "true":
                 case "false":
                 case "boolean":
-                    return "boolean";
+                    return 1;
                 default:
                     if (/[+-]?\d+/.test(tp)) {
-                        return "int";
+                        return 2;
                     } else if (/[+-]?\d*[.]\d+/.test(tp)) {
-                        return "double";
+                        return 3;
                     } else if (/[+-]?\d*[.]?\d+[eE][+-]?\d+/.test(tp)) {
-                        return "double";
+                        return 3;
                     } else {
-                        return null;
+                        return 0;
                     }
             }
         };
 
         const tsTypeToC = (tp: ts.Type) => {
 
-            var chs = {
-                "boolean":1,
-                "int":2,
-                "double":3,
-            };
+            var numtypenames=["any",  "bool","int","double"]
             var maxch=0;
-            var minch="z";
-            var utp;
-            var itp;
+            var minch=100000000000;
+            var utp="any";
+            var itp="any";
             if (tp.isUnionOrIntersection() && tp.types) {
                 
-                tp.types.some(cht => {
-                    let tp = tsTypeToCsingle(cht);
+                tp.types.forEach(cht => {
+                    let tpc = tsTypeToCsingle(cht);
 
-                    if (tp && chs[tp]) {
-                        if (chs[tp]>maxch) {
-                            maxch = chs[tp];
-                            utp = tp;
+                    if (tpc) {
+                        if (tpc>maxch) {
+                            maxch = tpc;
+                            utp = numtypenames[tpc];
                         }
-                        if (chs[tp]<minch) {
-                            minch = chs[tp];
-                            itp = tp;
+                        if (tpc<minch) {
+                            minch = tpc;
+                            itp = numtypenames[tpc];
                         }
                     } else {
-                        utp = null;
-                        return true;
+                        maxch = 100000000000;
+                        utp = "any";
                     }
-                    return false;
                 });
             }
             if (tp.isUnion()) {
@@ -2361,8 +2356,8 @@ export class Emitter {
             } else if (tp.isIntersection()) {
                 return itp;
             } else {
-                let rtp = tsTypeToCsingle(tp);
-                return rtp;
+                let rtpc = tsTypeToCsingle(tp);
+                return numtypenames[rtpc];
             }
         };
 
@@ -2402,9 +2397,10 @@ export class Emitter {
                 //let typeInfo:ts.Type;
                 //typeInfo = this.typeChecker.getTypeFromTypeNode(inferredTp);
                 //!this.resolver.isAnyLikeType(typeInfo)
+                // (ts.SyntaxKind[inferredTp.kind]);
 
                 if (node.type && this.isTemplateType(inferredTp)) {
-                    return (ts.SyntaxKind[inferredTp.kind]);
+                    return "RET";
                 } else {
                     let tp = this.typeChecker.getTypeFromTypeNode(inferredTp);
                     let r0 = tsTypeToC(tp);
