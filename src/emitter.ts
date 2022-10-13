@@ -1890,6 +1890,7 @@ export class Emitter {
 
         const typeInfo = this.resolver.getOrResolveTypeOf(type);
 
+        // detect if pointer
         const skipPointerIf =
             (typeInfo && (<any>typeInfo).symbol && (<any>typeInfo).symbol.name === '__type')
             || (typeInfo && (<any>typeInfo).primitiveTypesOnly)
@@ -1960,10 +1961,10 @@ export class Emitter {
                     || this.resolver.isTypeAlias((<any>type).typeName)) && !this.resolver.isThisType(typeInfo);
                 const isReadonly = typeReference && typeReference.typeArguments && typeReference.typeArguments.length==1 && 
                     typeReference.typeName && typeReference.typeName.getSourceFile() && typeReference.typeName.getText()=="Readonly";
-                // detect if pointer
                 const isEnum = this.isEnum(typeReference);
                 const isArray = this.resolver.isArrayType(typeInfo);
 
+                // detect if pointer
                 const skipPointerIfA =
                     skipPointerIf
                     || isEnum
@@ -3383,6 +3384,7 @@ export class Emitter {
             return;
         }
 
+        this.writer.writeString('(new ');
         if (!isTuple) {
             this.writer.writeString('array<');
             if (elementsType) {
@@ -3412,6 +3414,7 @@ export class Emitter {
         } else {
             this.writer.writeString('()');
         }
+        this.writer.writeString(')->shared_from_this()');
     }
 
     private processElementAccessExpression(node: ts.ElementAccessExpression): void {
@@ -3740,7 +3743,7 @@ export class Emitter {
         } else if (method.kind === ts.SyntaxKind.Constructor) {
             this.writer.writeString('_this');
         } else {
-            this.writer.writeString('shared_from_this()');
+            this.writer.writeString('object::shared_from_this()');
         }
     }
 
