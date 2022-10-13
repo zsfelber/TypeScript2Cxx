@@ -1165,33 +1165,62 @@ export class Emitter {
         this.processStatement(this.fixupParentReferences(enumDeclare, node));
         */
 
-        let w1:CodeWriter, w2:CodeWriter;
+        let w0:CodeWriter, w1:CodeWriter, w2:CodeWriter, w02:CodeWriter;
 
         let ow0 = this.writer;
 
         try {
-            this.writer = w1 = new CodeWriter();
-            w2.writeString('struct NAME_');
-            this.processIdentifier(node.name);
-            w2.BeginBlock();
+            this.writer = w0 = new CodeWriter();
+            w1 = new CodeWriter();
+            w2 = new CodeWriter();
+            w02 = new CodeWriter();
 
+            this.processIdentifier(node.name);
+            const id = w0.getText();
 
             w1.writeString('enum struct ');
-            this.processIdentifier(node.name);
+            w1.writeString(id);
+            w1.writeString(" ");
             w1.BeginBlock();
 
+            w02.writeString('struct Enum_');
+            w02.writeString(id);
+            w02.writeString(" ");
+            w02.BeginBlock();
+            w02.writeString('inline static js::string[] names() ');
+            w02.BeginBlock();
+            w02.writeStringNewLine('static bool initialized=false;');
+            w02.writeString('static js::string result[');
+
+            w2.Indent();
+            w2.Indent();
+            w2.writeStringNewLine('if (!initialized)');
+            w2.BeginBlock();
+            w2.writeStringNewLine('initialized=true;');
+
             let next = false;
+            let idCnt = 0;
             for (const member of node.members) {
                 if (next) {
                     w1.writeString(', ');
                 }
 
+                let name:string;
                 if (member.name.kind === ts.SyntaxKind.Identifier) {
-                    this.processExpression(member.name);
+                    let ow = this.writer;
+                    try {
+                        this.writer = new CodeWriter();
+                        this.processExpression(member.name);
+                        name = this.writer.getText();
+                    } finally {
+                        this.writer = ow;
+                    }
                 } else {
                     throw new Error('Not Implemented');
                 }
+                w1.writeString(name);
 
+                let w2_ok = false;
                 if (member.initializer) {
                     let litnode:ts.Expression = null;
                     let output:string = "";
@@ -1199,7 +1228,7 @@ export class Emitter {
                     try {
                         this.writer = new CodeWriter();
                         litnode = this.processExpression(member.initializer);
-                        output = w1.getText();
+                        output = this.writer.getText();
                     } finally {
                         this.writer = ow;
                     }
@@ -1208,10 +1237,18 @@ export class Emitter {
                             case ts.SyntaxKind.NumericLiteral:
                                 w1.writeString(' = ');
                                 w1.writeString(output);
+                                idCnt = Number(output) + 1;
                                 break;
                             case ts.SyntaxKind.StringLiteral: 
-                                w1.writeString(' = ');
-                                w1.writeString(output);
+                                w2_ok = true;
+                                if (next) {
+                                    w2.EndOfStatement();
+                                }
+                                w2.writeString("result[");
+                                w2.writeString(id);
+                                w2.writeString("::"+name+"] = ");
+                                w2.writeString(output);
+                                idCnt++;
                                 break;
                             default:
                                 console.warn('Enum value syntax not implemented : '+output+" kind:"+ts.SyntaxKind[litnode.kind]);
@@ -1219,6 +1256,19 @@ export class Emitter {
                         }
                     }
 
+                } else {
+                    idCnt++;
+                }
+                if (!w2_ok) {
+                    w2_ok = true;
+                    if (next) {
+                        w2.EndOfStatement();
+                    }
+                    w2.writeString("result[");
+                    w2.writeString(id);
+                    w2.writeString("::"+name+"] = \"");
+                    w2.writeString(name);
+                    w2.writeString("\"");
                 }
 
                 next = true;
@@ -1228,7 +1278,25 @@ export class Emitter {
             w1.EndOfStatement();
 
             w2.EndBlock();
+            w2.writeString('return result;');
+            w2.EndBlock();
+
+            w2.writeString('inline static js::string const & name('+id+' value) ');
+            w2.BeginBlock();
+            w2.writeStringNewLine('return Enum_'+id+"::names()[value];");
+            w2.EndBlock();
+
+            w2.EndBlock();
             w2.EndOfStatement();
+
+            w02.writeString(""+(idCnt));
+            w02.writeString("]");
+            w02.EndOfStatement();
+
+            ow0.writeString(w1.getText());
+            ow0.writeString(w02.getText());
+            ow0.writeString(w2.getText());
+
         } finally {
             this.writer = ow0;
         }

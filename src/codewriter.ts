@@ -27,6 +27,11 @@ export class CodeWriter {
         this.pendingIntent = true;
     }
 
+    public Indent() {
+        this.IncreaseIntent();
+        this.pendingIntent = true;
+    }
+
     public EndBlock(noNewLineAtTheEnd?: boolean) {
         this.DecreaseIntent();
         if (!this.newLine) {
@@ -65,6 +70,18 @@ export class CodeWriter {
         this.cancelNewLine();
 
         this.writeStringNewLine(';');
+        this.endOfStatement = true;
+    }
+
+    public EndOfStatement2(sepchar:string) {
+        if (this.endOfStatement) {
+            // cancelling empty statement;
+            return;
+        }
+
+        this.cancelNewLine();
+
+        this.writeStringNewLine(sepchar);
         this.endOfStatement = true;
     }
 
