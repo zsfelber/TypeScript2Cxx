@@ -2388,25 +2388,29 @@ export class Emitter {
                 }
             }*/
             if (!inferredTp) {
-                let sign = this.typeChecker.getSignatureFromDeclaration(node);
-                if (sign) {
-                    inferredTp0 = this.typeChecker.getReturnTypeOfSignature(sign);
-                    inferredTp = this.typeChecker.typeToTypeNode(inferredTp0);
-                    if (!inferredTp) {
-                        console.log("Could not infer return type:" + 
+                try {
+                    let sign = this.typeChecker.getSignatureFromDeclaration(node);
+                    if (sign) {
+                        inferredTp0 = this.typeChecker.getReturnTypeOfSignature(sign);
+                        inferredTp = this.typeChecker.typeToTypeNode(inferredTp0);
+                        /*if (!inferredTp) {
+                            console.log("Could not infer return type:" + 
+                            (node.name ? 
+                            node.name.getText() : "noname : ")
+                            +
+                            (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
+                            );
+                        }*/
+                    } else {
+                        /*console.log("Could not get signature metadata so infer return type:" + 
                         (node.name ? 
                         node.name.getText() : "noname : ")
                         +
                         (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
-                        );
-                        }
-                } else {
-                    console.log("Could not get signature metadata so infer return type:" + 
-                    (node.name ? 
-                    node.name.getText() : "noname : ")
-                    +
-                    (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
-                    );
+                        );*/
+                    }
+                } catch(drop) {
+                    
                 }
             }
 
@@ -2725,7 +2729,7 @@ export class Emitter {
                     this.writer.writeString(', ');
                 }
 
-                this.writer.writeString('typename RET');
+                this.writer.writeString('typename RET=void');
                 next = true;
             }
 
