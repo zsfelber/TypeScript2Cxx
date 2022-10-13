@@ -1968,7 +1968,7 @@ export class Emitter {
                     skipPointerIf
                     || isEnum
                     || isTypeAlias
-                    || isReadonly
+                    //|| isReadonly
                     //|| isArray
                     ;
 
@@ -2019,7 +2019,7 @@ export class Emitter {
                 if (isReadonly) {
                     const element = typeReference.typeArguments[0];
 
-                    this.processType(element);
+                    this.processType(element, false, true);
 
                 } else if (typeReference.typeArguments) {
                     this.writer.writeString('<');
