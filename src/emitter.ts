@@ -1922,7 +1922,7 @@ export class Emitter {
                 break;
             case ts.SyntaxKind.ArrayType:
                 const arrayType = <ts.ArrayTypeNode>type;
-                if (isParam && !skipPointerIf) {
+                if (/*isParam && */!skipPointerIf) {
                     this.writer.writeString('std::shared_ptr<');
                 }
                 this.writer.writeString('array<');
@@ -1933,7 +1933,7 @@ export class Emitter {
                     this.writer.writeString('any');
                 }
                 this.writer.writeString('>');
-                if (isParam && !skipPointerIf) {
+                if (/*isParam && */!skipPointerIf) {
                     this.writer.writeString('>');
                 }
                 break;
@@ -1968,8 +1968,8 @@ export class Emitter {
                     skipPointerIf
                     || isEnum
                     || isTypeAlias
+                    || isReadonly
                     //|| isArray
-                    //|| isReadonly
                     ;
 
                 if (!skipPointerIfA) {
