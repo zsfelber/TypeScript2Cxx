@@ -2244,10 +2244,10 @@ constexpr const T const_(T t) {
             js::pointer_t,
             js::number,
             js::string,
-            js::array_any,
-            js::object,
             std::shared_ptr<js::function>,
-            std::shared_ptr<js::object>>;
+            std::shared_ptr<js::object>,
+            std::shared_ptr<js::array_any>
+            >;
 
         any_value_type _value;
 
@@ -2301,11 +2301,19 @@ constexpr const T const_(T t) {
         {
         }
 
-        any(const js::array_any &value) : _value(value)
+        any(const js::array_any &value) : _value(&value)
         {
         }
 
-        any(const js::object &value) : _value(value)
+        any(const js::object &value) : _value(&value)
+        {
+        }
+
+        any(const std::shared_ptr<js::array_any> &value) : _value(value)
+        {
+        }
+
+        any(const std::shared_ptr<js::object> &value) : _value(value)
         {
         }
 
@@ -3801,7 +3809,7 @@ constexpr const T const_(T t) {
         template <typename K, typename V>
         ObjectKeys<js::string, typename object<K, V>::Cnt> object<K, V>::keys()
         {
-            return ObjectKeys<js::string, object<K, V>::Cnt>(get());
+            return ObjectKeys<js::string, object<K, V>::Cnt>(_values);
         }
 
         template <typename K, typename V>
