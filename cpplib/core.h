@@ -2091,7 +2091,7 @@ constexpr const T const_(T t) {
 
             object(const undefined_t &);
 
-            virtual ~object()
+            /*!*/virtual/*!*/ ~object()
             {
             }
 

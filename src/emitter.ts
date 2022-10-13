@@ -1328,10 +1328,12 @@ export class Emitter {
             this.writer.writeString(' : public object');
         }
 
-        this.writer.writeString(', public std::enable_shared_from_this<');
-        this.processIdentifier(node.name);
-        this.processTemplateParameters(<ts.ClassDeclaration>node);
-        this.writer.writeString('>');
+        // Not required:
+        // already done in core.h/tmpl::object and also "virtual ~object()" :
+        //this.writer.writeString(', public std::enable_shared_from_this<');
+        //this.processIdentifier(node.name);
+        //this.processTemplateParameters(<ts.ClassDeclaration>node);
+        //this.writer.writeString('>');
 
         this.writer.writeString(' ');
         this.writer.BeginBlock();
@@ -1340,10 +1342,10 @@ export class Emitter {
         this.writer.IncreaseIntent();
         this.writer.writeStringNewLine();
 
-        this.writer.writeString('using std::enable_shared_from_this<');
-        this.processIdentifier(node.name);
-        this.processTemplateParameters(<ts.ClassDeclaration>node);
-        this.writer.writeStringNewLine('>::shared_from_this;');
+        //this.writer.writeString('using std::enable_shared_from_this<');
+        //this.processIdentifier(node.name);
+        //this.processTemplateParameters(<ts.ClassDeclaration>node);
+        //this.writer.writeStringNewLine('>::shared_from_this;');
 
         /*
         if (!node.heritageClauses) {
