@@ -28,6 +28,9 @@
 #include <thread>
 #include <future>
 
+// https://github.com/aantron/better-enums
+// #include "enum.h"
+
 namespace js
 {
 
