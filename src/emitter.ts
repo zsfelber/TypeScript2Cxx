@@ -1954,7 +1954,7 @@ export class Emitter {
                     || isEnum
                     || skipPointerInType
                     || isTypeAlias
-                    || isArray
+                    //|| isArray
                     || isReadonly;
 
                 if (!skipPointerIf) {
@@ -2326,11 +2326,11 @@ export class Emitter {
 
         const tsTypeToC = (tp: ts.Type) => {
 
-            var numtypenames=["any",  "bool","int","double"]
+            var numtypenames=[null,  "bool","int","double"]
             var maxch=0;
             var minch=100000000000;
-            var utp="any";
-            var itp="any";
+            var utp=null;
+            var itp=null;
             if (tp.isUnionOrIntersection() && tp.types) {
                 
                 tp.types.forEach(cht => {
@@ -2347,7 +2347,7 @@ export class Emitter {
                         }
                     } else {
                         maxch = 100000000000;
-                        utp = "any";
+                        utp = null;
                     }
                 });
             }
@@ -2363,6 +2363,7 @@ export class Emitter {
 
         const findReturnType = () => {
             let inferredTp = node.type;
+            let inferredTp0:ts.Type;
             /*if (!inferredTp && r && r.hasValue()) {
                 inferredTp = 
                     this.resolver.getOrResolveTypeOfAsTypeNode(r.returnStatement.expression);
@@ -2373,8 +2374,8 @@ export class Emitter {
             if (!inferredTp) {
                 let sign = this.typeChecker.getSignatureFromDeclaration(node);
                 if (sign) {
-                    let typeNoNode = this.typeChecker.getReturnTypeOfSignature(sign);
-                    inferredTp = this.typeChecker.typeToTypeNode(typeNoNode);
+                    inferredTp0 = this.typeChecker.getReturnTypeOfSignature(sign);
+                    inferredTp = this.typeChecker.typeToTypeNode(inferredTp0);
                     if (!inferredTp) {
                         console.log("Could not infer return type:" + 
                         (node.name ? 
@@ -2402,10 +2403,16 @@ export class Emitter {
                 if (node.type && this.isTemplateType(inferredTp)) {
                     return "RET";
                 } else {
-                    let tp = this.typeChecker.getTypeFromTypeNode(inferredTp);
-                    let r0 = tsTypeToC(tp);
+                    if (!inferredTp0) {
+                        inferredTp0 = this.typeChecker.getTypeFromTypeNode(inferredTp);
+                    }
+                    let r0 = tsTypeToC(inferredTp0);
                     if (r0) {
                         return r0;
+                    } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
+                        return ('string');
+                    } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
+                        return ('std::size_t');
                     } else {
                         let ow = this.writer;
                         try {
@@ -2421,8 +2428,10 @@ export class Emitter {
                 if (noReturn) {
                     return 'void';
                 } else {
-                    if (isClassMember && (<ts.Identifier>node.name).text === 'toString') {
+                    if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
                         return ('string');
+                    } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
+                        return ('std::size_t');
                     } else {
                         return ('any');
                     }
