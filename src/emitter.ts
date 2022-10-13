@@ -1874,7 +1874,7 @@ export class Emitter {
 
     private processType(typeIn: ts.TypeNode | ts.ParameterDeclaration | ts.TypeParameterDeclaration | ts.Expression,
         auto: boolean = false, skipPointerInType: boolean = false, noTypeName: boolean = false,
-        implementingUnionType: boolean = false): void {
+        implementingUnionType: boolean = false, isParam : boolean = false): void {
 
         if (auto) {
             this.writer.writeString('auto');
@@ -1885,6 +1885,19 @@ export class Emitter {
         if (typeIn && typeIn.kind === ts.SyntaxKind.LiteralType) {
             type = (<ts.LiteralTypeNode>typeIn).literal;
         }
+
+        const typeInfo = this.resolver.getOrResolveTypeOf(type);
+
+        const skipPointerIf =
+            (typeInfo && (<any>typeInfo).symbol && (<any>typeInfo).symbol.name === '__type')
+            || (typeInfo && (<any>typeInfo).primitiveTypesOnly)
+            || (typeInfo && (<any>typeInfo).intrinsicName === 'number')
+            || this.resolver.isTypeFromSymbol(typeInfo, ts.SyntaxKind.TypeParameter)
+            || this.resolver.isTypeFromSymbol(typeInfo, ts.SyntaxKind.EnumMember)
+            || this.resolver.isTypeFromSymbol(typeInfo, ts.SyntaxKind.EnumDeclaration)
+            || (type && this.resolver.isTypeFromSymbol((<any>type).typeName, ts.SyntaxKind.EnumDeclaration))
+            || skipPointerInType
+            ;
 
         let next;
         switch (type && type.kind) {
@@ -1907,6 +1920,9 @@ export class Emitter {
                 break;
             case ts.SyntaxKind.ArrayType:
                 const arrayType = <ts.ArrayTypeNode>type;
+                if (isParam && !skipPointerIf) {
+                    this.writer.writeString('std::shared_ptr<');
+                }
                 this.writer.writeString('array<');
                 if (arrayType.elementType && arrayType.elementType.kind !== ts.SyntaxKind.UndefinedKeyword) {
                     this.processType(arrayType.elementType, false);
@@ -1914,6 +1930,9 @@ export class Emitter {
                     this.writer.writeString('any');
                 }
                 this.writer.writeString('>');
+                if (isParam && !skipPointerIf) {
+                    this.writer.writeString('>');
+                }
                 break;
             case ts.SyntaxKind.TupleType:
                 const tupleType = <ts.TupleTypeNode>type;
@@ -1934,7 +1953,6 @@ export class Emitter {
                 break;
             case ts.SyntaxKind.TypeReference:
                 const typeReference = <ts.TypeReferenceNode>type;
-                const typeInfo = this.resolver.getOrResolveTypeOf(type);
                 const isTypeAlias = ((typeInfo && this.resolver.checkTypeAlias(typeInfo.aliasSymbol))
                     || this.resolver.isTypeAlias((<any>type).typeName)) && !this.resolver.isThisType(typeInfo);
                 const isReadonly = typeReference && typeReference.typeArguments && typeReference.typeArguments.length==1 && 
@@ -1943,22 +1961,15 @@ export class Emitter {
                 const isEnum = this.isEnum(typeReference);
                 const isArray = this.resolver.isArrayType(typeInfo);
 
-                const skipPointerIf =
-                    (typeInfo && (<any>typeInfo).symbol && (<any>typeInfo).symbol.name === '__type')
-                    || (typeInfo && (<any>typeInfo).primitiveTypesOnly)
-                    || (typeInfo && (<any>typeInfo).intrinsicName === 'number')
-                    || this.resolver.isTypeFromSymbol(typeInfo, ts.SyntaxKind.TypeParameter)
-                    || this.resolver.isTypeFromSymbol(typeInfo, ts.SyntaxKind.EnumMember)
-                    || this.resolver.isTypeFromSymbol(typeInfo, ts.SyntaxKind.EnumDeclaration)
-                    || this.resolver.isTypeFromSymbol((<any>type).typeName, ts.SyntaxKind.EnumDeclaration)
+                const skipPointerIfA =
+                    skipPointerIf
                     || isEnum
-                    || skipPointerInType
                     || isTypeAlias
                     //|| isArray
                     //|| isReadonly
                     ;
 
-                if (!skipPointerIf) {
+                if (!skipPointerIfA) {
                     this.writer.writeString('std::shared_ptr<');
                 }
 
@@ -2023,7 +2034,7 @@ export class Emitter {
                     this.writer.writeString('>');
                 }
 
-                if (!skipPointerIf) {
+                if (!skipPointerIfA) {
                     this.writer.writeString('>');
                 }
 
@@ -2532,7 +2543,7 @@ export class Emitter {
             } else if (this.isTemplateType(effectiveType)) {
                 this.writer.writeString('P' + index);
             } else {
-                this.processType(effectiveType, isArrowFunction);
+                this.processType(effectiveType, isArrowFunction, false, false, false, true);
             }
 
             this.writer.writeString(' ');
