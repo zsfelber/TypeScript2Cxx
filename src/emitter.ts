@@ -1957,8 +1957,11 @@ export class Emitter {
                 break;
             case ts.SyntaxKind.TypeReference:
                 const typeReference = <ts.TypeReferenceNode>type;
-                const isTypeAlias = ((typeInfo && this.resolver.checkTypeAlias(typeInfo.aliasSymbol))
+                let isTypeAlias = false;
+                try {
+                    isTypeAlias = ((typeInfo && this.resolver.checkTypeAlias(typeInfo.aliasSymbol))
                     || this.resolver.isTypeAlias((<any>type).typeName)) && !this.resolver.isThisType(typeInfo);
+                } catch (drop){}
                 const isReadonly = typeReference && typeReference.typeArguments && typeReference.typeArguments.length==1 && 
                     typeReference.typeName && typeReference.typeName.getSourceFile() && typeReference.typeName.getText()=="Readonly";
                 const isEnum = this.isEnum(typeReference);
