@@ -1925,7 +1925,8 @@ export class Emitter {
                 }
                 this.writer.writeString('array<');
                 if (arrayType.elementType && arrayType.elementType.kind !== ts.SyntaxKind.UndefinedKeyword) {
-                    this.processType(arrayType.elementType, false);
+                    this.processType(arrayType.elementType, false, true);
+
                 } else {
                     this.writer.writeString('any');
                 }

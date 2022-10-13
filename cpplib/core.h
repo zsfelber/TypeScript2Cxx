@@ -1279,10 +1279,10 @@ constexpr const T const_(T t) {
                 return _value;
             }
 
-            inline operator size_t()
+            /*inline operator size_t()
             {
                 return _value.size();
-            }
+            }*/
 
             inline bool is_null() const
             {
@@ -1294,7 +1294,7 @@ constexpr const T const_(T t) {
                 return _control == string_undefined;
             }
 
-            js::number get_length()
+            js::number get_length() const
             {
                 return js::number(_value.size());
             }
@@ -1728,69 +1728,20 @@ constexpr const T const_(T t) {
 
     namespace tmpl
     {
-        // core.h:1755:23: error: explicit specialization in non-namespace scope ‘struct js::tmpl::array<T>’
-        // 1755 |             template <>
+
 
         template <typename E>
-        struct array_type_helper
+        struct array : public std::enable_shared_from_this<array<E>>
         {
-            using array_type_base = std::vector<E>;
-            //using array_type = array_type_base; // array_type_base - value type, std::shared_ptr<array_type_base> - reference type
-            using array_type = std::shared_ptr<array_type_base>; // array_type_base - value type, std::shared_ptr<array_type_base> - reference type
-            using array_type_ref = array_type_base &;
 
-        };
-
-        template <typename E, typename array_type>
-        struct array_traits
-        {
-            using array_type_base = typename array_type_helper<E>::array_type_base;
-
-            template <class... _Types>
-            static array_type create(_Types &&..._Args)
-            {
-                return array_type_base(_Args...);
-            }
-
-            static constexpr array_type &access(std::remove_reference_t<array_type> &_Arg)
-            {
-                return (static_cast<array_type &>(_Arg));
-            }
-        };
-
-        template <typename E>
-        struct array_traits<E,std::shared_ptr<typename array_type_helper<E>::array_type_base>>
-        {
-            using array_type_base = typename array_type_helper<E>::array_type_base;
-            using array_type = typename array_type_helper<E>::array_type;
-            using array_type_ref = typename array_type_helper<E>::array_type_ref;
-
-            template <class... _Types>
-            static inline auto create(_Types &&..._Args)
-            {
-                return std::make_shared<array_type_base>(_Args...);
-            }
-
-            static inline array_type_ref access(array_type &_Arg)
-            {
-                return (static_cast<array_type_ref>(*_Arg));
-            }
-        };
-
-        template <typename E>
-        struct array
-        {
-            using array_type_base = typename array_type_helper<E>::array_type_base;
-            using array_type = typename array_type_helper<E>::array_type;
-            using array_type_ref = typename array_type_helper<E>::array_type_ref;
-
-            using array_traits_ = array_traits<E,array_type>;
+            using Cnt = std::vector<E>;
+            using std::enable_shared_from_this<array<E>>::shared_from_this;
 
 
             bool isUndefined;
-            array_type _values;
+            Cnt _values;
 
-            array() : _values(array_traits_::create()), isUndefined(false)
+            array() : isUndefined(false)
             {
             }
 
@@ -1798,15 +1749,15 @@ constexpr const T const_(T t) {
             {
             }
 
-            array(std::initializer_list<E> values) : _values(array_traits_::create(values)), isUndefined(false)
+            array(std::initializer_list<E> values) : _values(values), isUndefined(false)
             {
             }
 
-            array(std::vector<E> values) : _values(array_traits_::create(values)), isUndefined(false)
+            array(Cnt values) : _values(values), isUndefined(false)
             {
             }
 
-            array(const undefined_t &undef) : _values(array_traits_::create()), isUndefined(true)
+            array(const undefined_t &undef) : isUndefined(true)
             {
             }
 
@@ -1820,26 +1771,21 @@ constexpr const T const_(T t) {
                 return this;
             }
 
-            constexpr array_type_ref get() const
+            size_t get_length() const
             {
-                return array_traits_::access(mutable_(_values));
+                return _values.size();
             }
 
-            constexpr array_type_ref get()
+            size_t size() const
             {
-                return array_traits_::access(_values);
-            }
-
-            size_t get_length()
-            {
-                return get().size();
+                return _values.size();
             }
 
             template <typename N = void>
             requires can_cast_to_size_t<N>
                 E &operator[](N i) const
             {
-                if (static_cast<size_t>(i) >= get().size())
+                if (static_cast<size_t>(i) >= _values.size())
                 {
                     if constexpr (std::is_same_v<decltype(E{undefined}), E>)
                     {
@@ -1853,36 +1799,36 @@ constexpr const T const_(T t) {
                     }
                 }
 
-                return mutable_(get())[static_cast<size_t>(i)];
+                return mutable_(_values)[static_cast<size_t>(i)];
             }
 
             template <typename N = void>
             requires can_cast_to_size_t<N>
                 E &operator[](N i)
             {
-                while (static_cast<size_t>(i) >= get().size())
+                while (static_cast<size_t>(i) >= _values.size())
                 {
                     if constexpr (std::is_same_v<decltype(E{undefined}), E>)
                     {
-                        get().push_back(E{undefined});
+                        _values.push_back(E{undefined});
                     }
                     else
                     {
-                        get().push_back(E{});
+                        _values.push_back(E{});
                     }
                 }
 
-                return get()[static_cast<size_t>(i)];
+                return _values[static_cast<size_t>(i)];
             }
 
             ArrayKeys<size_t> keys()
             {
-                return ArrayKeys<size_t>(get().size());
+                return ArrayKeys<size_t>(_values.size());
             }
 
             void push(E t)
             {
-                get().push_back(t);
+                _values.push_back(t);
             }
 
             template <typename... Args>
@@ -1890,45 +1836,45 @@ constexpr const T const_(T t) {
             {
                 for (const auto &item : {args...})
                 {
-                    get().push_back(item);
+                    _values.push_back(item);
                 }
             }
 
             E pop()
             {
-                return get().pop_back();
+                return _values.pop_back();
             }
 
             template <typename... Args>
             void splice(size_t position, size_t size, Args... args)
             {
-                get().erase(get().cbegin() + position, get().cbegin() + position + size);
-                get().insert(get().cbegin() + position, {args...});
+                _values.erase(_values.cbegin() + position, _values.cbegin() + position + size);
+                _values.insert(_values.cbegin() + position, {args...});
             }
 
             array slice(size_t first, size_t last)
             {
-                return array(std::vector<E>(get().cbegin() + first, get().cbegin() + last + 1));
+                return array(Cnt(_values.cbegin() + first, _values.cbegin() + last + 1));
             }
 
             js::number indexOf(const E &e)
             {
-                return get().cend() - std::find(get().cbegin(), get().cend(), e) - 1;
+                return _values.cend() - std::find(_values.cbegin(), _values.cend(), e) - 1;
             }
 
             js::boolean removeElement(const E &e)
             {
-                return get().erase(std::find(get().cbegin(), get().cend(), e)) != get().cend();
+                return _values.erase(std::find(_values.cbegin(), _values.cend(), e)) != _values.cend();
             }
 
             auto begin()
             {
-                return get().begin();
+                return _values.begin();
             }
 
             auto end()
             {
-                return get().end();
+                return _values.end();
             }
 
             friend std::ostream &operator<<(std::ostream &os, array val)
@@ -1945,7 +1891,7 @@ constexpr const T const_(T t) {
             requires can_cast_to_size_t<N>
             bool exists(N n) const
             {
-                return static_cast<size_t>(n) < get().size();
+                return static_cast<size_t>(n) < _values.size();
             }
 
             template <class T>
@@ -1956,16 +1902,16 @@ constexpr const T const_(T t) {
 
             array filter(std::function<bool(E)> p)
             {
-                std::vector<E> result;
-                std::copy_if(get().begin(), get().end(), std::back_inserter(result), p);
+                Cnt result;
+                std::copy_if(_values.begin(), _values.end(), std::back_inserter(result), p);
                 return result;
             }
 
             array filter(std::function<bool(E, size_t)> p)
             {
-                std::vector<E> result;
-                auto first = &(get())[0];
-                std::copy_if(get().begin(), get().end(), std::back_inserter(result), [=](auto &v)
+                Cnt result;
+                auto first = &(_values)[0];
+                std::copy_if(_values.begin(), _values.end(), std::back_inserter(result), [=](auto &v)
                              {
                                  auto index = &v - first;
                                  return p(v, index);
@@ -1977,7 +1923,7 @@ constexpr const T const_(T t) {
             auto map(F p) -> array<undefined_t>
             {
                 std::vector<undefined_t> result;
-                std::transform(get().begin(), get().end(), std::back_inserter(result), [=](auto &v)
+                std::transform(_values.begin(), _values.end(), std::back_inserter(result), [=](auto &v)
                                {
                                    mutable_(p)(v);
                                    return undefined;
@@ -1991,7 +1937,7 @@ constexpr const T const_(T t) {
             auto map(F p) -> array<decltype(p(E()))>
             {
                 std::vector<decltype(p(E()))> result;
-                std::transform(get().begin(), get().end(), std::back_inserter(result), [=](auto &v)
+                std::transform(_values.begin(), _values.end(), std::back_inserter(result), [=](auto &v)
                                { return mutable_(p)(v); });
 
                 return array<decltype(p(E()))>(result);
@@ -2001,8 +1947,8 @@ constexpr const T const_(T t) {
             auto map(F p) -> array<decltype(p(E(), 0))>
             {
                 std::vector<decltype(p(E(), 0))> result;
-                auto first = &(get())[0];
-                std::transform(get().begin(), get().end(), std::back_inserter(result), [=](auto &v)
+                auto first = &(_values)[0];
+                std::transform(_values.begin(), _values.end(), std::back_inserter(result), [=](auto &v)
                                {
                                    auto index = &v - first;
                                    return mutable_(p)(v, index);
@@ -2015,42 +1961,42 @@ constexpr const T const_(T t) {
             template <typename P>
             auto reduce(P p)
             {
-                return std::reduce(get().begin(), get().end(), 0, p);
+                return std::reduce(_values.begin(), _values.end(), 0, p);
             }
 
             template <typename P, typename I>
             auto reduce(P p, I initial)
             {
-                return std::reduce(get().begin(), get().end(), initial, p);
+                return std::reduce(_values.begin(), _values.end(), initial, p);
             }
 
             template <typename P>
             boolean every(P p)
             {
-                return std::all_of(get().begin(), get().end(), p);
+                return std::all_of(_values.begin(), _values.end(), p);
             }
 
             template <typename P>
             boolean some(P p)
             {
-                return std::any_of(get().begin(), get().end(), p);
+                return std::any_of(_values.begin(), _values.end(), p);
             }
 
             js::string join(js::string s)
             {
-                return std::accumulate(get().begin(), get().end(), js::string{}, [&](auto &res, auto &piece)
+                return std::accumulate(_values.begin(), _values.end(), js::string{}, [&](auto &res, auto &piece)
                                        { return res += (res) ? s + piece : piece; });
             }
 
             void forEach(std::function<void(E)> p)
             {
-                std::for_each(get().begin(), get().end(), p);
+                std::for_each(_values.begin(), _values.end(), p);
             }
 
             void forEach(std::function<void(E, size_t)> p)
             {
-                auto first = &(*_values.get())[0];
-                std::for_each(get().begin(), get().end(), [=](auto &v)
+                auto first = &(*_values._values)[0];
+                std::for_each(_values.begin(), _values.end(), [=](auto &v)
                               {
                                   auto index = &v - first;
                                   return p(v, index);
@@ -2102,12 +2048,14 @@ constexpr const T const_(T t) {
 
     namespace tmpl
     {
-        // core.h:2138:23: error: explicit specialization in non-namespace scope ‘struct js::tmpl::object<K, V>’
-        // 2138 |             template <>
+
 
         template <typename K, typename V>
-        struct map_type_helper
+        struct object : public std::enable_shared_from_this<object<K, V>>
         {
+            friend struct ObjectKeys<K, V>;
+            friend struct any;
+
             struct K_hash
             {
                 typedef K argument_type;
@@ -2127,62 +2075,13 @@ constexpr const T const_(T t) {
                 }
             };
 
-            using object_type_base = std::unordered_map<K, V, K_hash, K_equal_to>;
-            //using object_type = object_type_base; // object_type_base - value type, std::shared_ptr<object_type_base> - reference type
-            using object_type = std::shared_ptr<object_type_base>; // object_type_base - value type, std::shared_ptr<object_type_base> - reference type
-            using object_type_ref = object_type_base &;
+            using Cnt = std::unordered_map<K, V, K_hash, K_equal_to>;
+            using std::enable_shared_from_this<object<K, V>>::shared_from_this;
+
             using pair = std::pair<const K, V>;
 
-        };
-
-        template <typename K, typename V, typename object_type>
-        struct object_traits
-        {
-            using object_type_base = typename map_type_helper<K, V>::object_type_base;
-
-            template <class... _Types>
-            static object_type create(_Types &&..._Args)
-            {
-                return object_type_base(_Args...);
-            }
-
-            static constexpr object_type &access(std::remove_reference_t<object_type> &_Arg)
-            {
-                return (static_cast<object_type &>(_Arg));
-            }
-        };
-
-        template <typename K, typename V>
-        struct object_traits<K, V, std::shared_ptr<typename map_type_helper<K, V>::object_type_base>>
-        {
-            using object_type_base = typename map_type_helper<K, V>::object_type_base;
-            using object_type = typename map_type_helper<K, V>::object_type;
-            using object_type_ref = typename map_type_helper<K, V>::array_type_ref;
-
-            template <class... _Types>
-            static inline auto create(_Types &&..._Args)
-            {
-                return std::make_shared<object_type_base>(_Args...);
-            }
-
-            static inline object_type_ref access(object_type &_Arg)
-            {
-                return (static_cast<object_type_ref>(*_Arg));
-            }
-        };
-
-        template <typename K, typename V>
-        struct object
-        {
-            using object_type_base = typename map_type_helper<K, V>::object_type_base;
-            using object_type = typename map_type_helper<K, V>::object_type;
-            using object_type_ref = typename map_type_helper<K, V>::object_type_ref;
-            using pair = typename map_type_helper<K, V>::pair;
-
-            using object_traits_ = object_traits<K,V,object_type>;
-
             bool isUndefined;
-            object_type _values;
+            Cnt _values;
 
             object();
 
@@ -2201,19 +2100,9 @@ constexpr const T const_(T t) {
                 return !isUndefined;
             }
 
-            constexpr object_type_ref get() const
-            {
-                return object_traits_::access(mutable_(_values));
-            }
+            static ObjectKeys<js::string, Cnt> keys(const object &);
 
-            constexpr object_type_ref get()
-            {
-                return object_traits_::access(_values);
-            }
-
-            static ObjectKeys<js::string, object_type_base> keys(const object &);
-
-            ObjectKeys<js::string, object_type_base> keys();
+            ObjectKeys<js::string, Cnt> keys();
 
             constexpr object *operator->()
             {
@@ -2244,33 +2133,42 @@ constexpr const T const_(T t) {
                 return isUndefined == other.isUndefined && isUndefined == true;
             }
 
+            size_t size() const
+            {
+                return _values.size();
+            }
+
             void Delete(js::number field)
             {
-                get().erase(field.operator std::string /*&*/());
+                _values.erase(field.operator std::string /*&*/());
             }
 
             void Delete(js::string field)
             {
-                get().erase(field.operator std::string &());
+                _values.erase(field.operator std::string &());
             }
 
             void Delete(js::any field);
 
             void Delete(js::undefined_t)
             {
-                get().erase("undefined");
+                _values.erase("undefined");
             }
 
             void Delete(const char_t *field)
             {
-                get().erase(field);
+                _values.erase(field);
+            }
+        
+            void Delete(const std::string & field) {
+                _values.erase(field);
             }
 
             template <typename N = void>
             requires ArithmeticOrEnum<N>
             bool exists(N n) const
             {
-                return get().find(js::string(to_tstring(n))) != get().end();
+                return _values.find(js::string(to_tstring(n))) != _values.end();
             }
 
             template <class T>
@@ -2278,7 +2176,7 @@ constexpr const T const_(T t) {
             {
                 if constexpr (is_stringish_v<T>)
                 {
-                    return get().find(i) != get().end();
+                    return _values.find(i) != _values.end();
                 }
 
                 return false;
@@ -2704,9 +2602,9 @@ constexpr const T const_(T t) {
             case anyTypeId::string_type:
                 return string_ref()._value.length() > 0;
             case anyTypeId::object_type:
-                return object_ref()->get().size() > 0;
+                return object_ref()->size() > 0;
             case anyTypeId::array_type:
-                return array_ref()->get().size() > 0;
+                return array_ref()->size() > 0;
             case anyTypeId::pointer_type:
                 return get<pointer_t>();
             case anyTypeId::class_type:
@@ -3437,7 +3335,7 @@ constexpr const T const_(T t) {
             switch (get_type())
             {
             case anyTypeId::object_type:
-                object_ref().get().erase(field);
+                object_ref().Delete(field);
                 break;
 
             default:
@@ -3445,7 +3343,7 @@ constexpr const T const_(T t) {
             }
         }
 
-        js::number get_length()
+        js::number get_length() const
         {
             switch (get_type())
             {
@@ -3783,7 +3681,7 @@ constexpr const T const_(T t) {
             return get() != other.get();
         }
 
-        number get_length()
+        number get_length() const
         {
             return get()->get_length();
         }
@@ -3864,7 +3762,7 @@ constexpr const T const_(T t) {
 
         // Object
         template <typename K, typename V>
-        object<K, V>::object() : _values(object_traits<K, V,typename object<K, V>::object_type>::create()), isUndefined(false)
+        object<K, V>::object() : isUndefined(false)
         {
         }
 
@@ -3874,91 +3772,90 @@ constexpr const T const_(T t) {
         }
 
         template <typename K, typename V>
-        object<K, V>::object(std::initializer_list<pair> values) : _values(object_traits<K, V,typename object<K, V>::object_type>::create(values)), isUndefined(false)
+        object<K, V>::object(std::initializer_list<pair> values) : _values(values), isUndefined(false)
         {
-            auto &ref = get();
             for (auto &item : values)
             {
-                ref[item.first] = item.second;
+                _values[item.first] = item.second;
             }
         }
 
         template <typename K, typename V>
-        object<K, V>::object(const undefined_t &) : _values(object_traits<K, V,typename object<K, V>::object_type>::create()), isUndefined(true)
+        object<K, V>::object(const undefined_t &) : isUndefined(true)
         {
         }
 
         template <typename K, typename V>
         void object<K, V>::Delete(js::any field)
         {
-            get().erase(field.operator std::string /*&*/());
+            _values.erase(field.operator std::string /*&*/());
         }
 
 
         template <typename K, typename V>
-        ObjectKeys<js::string, typename object<K, V>::object_type_base> object<K, V>::keys(const object<K, V> &obj)
+        ObjectKeys<js::string, typename object<K, V>::Cnt> object<K, V>::keys(const object<K, V> &obj)
         {
-            return ObjectKeys<js::string, object<K, V>::object_type_base>(obj->get());
+            return ObjectKeys<js::string, object<K, V>::Cnt>(obj->_values);
         }
 
         template <typename K, typename V>
-        ObjectKeys<js::string, typename object<K, V>::object_type_base> object<K, V>::keys()
+        ObjectKeys<js::string, typename object<K, V>::Cnt> object<K, V>::keys()
         {
-            return ObjectKeys<js::string, object<K, V>::object_type_base>(get());
+            return ObjectKeys<js::string, object<K, V>::Cnt>(get());
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](js::number n) const
         {
-            return mutable_(get())[static_cast<std::string>(n)];
+            return mutable_(_values)[static_cast<std::string>(n)];
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](js::number n)
         {
-            return get()[static_cast<std::string>(n)];
+            return _values[static_cast<std::string>(n)];
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](const char_t *s) const
         {
-            return mutable_(get())[std::string(s)];
+            return mutable_(_values)[std::string(s)];
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](std::string s) const
         {
-            return mutable_(get())[s];
+            return mutable_(_values)[s];
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](js::string s) const
         {
-            return mutable_(get())[(std::string)s];
+            return mutable_(_values)[(std::string)s];
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](const char_t *s)
         {
-            return get()[std::string(s)];
+            return _values[std::string(s)];
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](std::string s)
         {
-            return get()[s];
+            return _values[s];
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](js::string s)
         {
-            return get()[(std::string)s];
+            return _values[(std::string)s];
         }
 
         template <typename K, typename V>
         any &object<K, V>::operator[](undefined_t)
         {
-            return get()["undefined"];
+            return _values["undefined"];
         }
 
     } // namespace tmpl
