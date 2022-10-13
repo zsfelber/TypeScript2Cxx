@@ -1927,7 +1927,7 @@ export class Emitter {
                 }
                 this.writer.writeString('array<');
                 if (arrayType.elementType && arrayType.elementType.kind !== ts.SyntaxKind.UndefinedKeyword) {
-                    this.processType(arrayType.elementType, false, true);
+                    this.processType(arrayType.elementType/*, false, true*/);
 
                 } else {
                     this.writer.writeString('any');
@@ -1948,7 +1948,7 @@ export class Emitter {
                         this.writer.writeString(', ');
                     }
 
-                    this.processType(element, false);
+                    this.processType(element);
                     next = true;
                 });
 
@@ -2019,7 +2019,7 @@ export class Emitter {
                 if (isReadonly) {
                     const element = typeReference.typeArguments[0];
 
-                    this.processType(element, false);
+                    this.processType(element);
 
                 } else if (typeReference.typeArguments) {
                     this.writer.writeString('<');
@@ -2030,7 +2030,7 @@ export class Emitter {
                             this.writer.writeString(', ');
                         }
 
-                        this.processType(element, false);
+                        this.processType(element);
                         next1 = true;
                     });
 
@@ -2650,11 +2650,11 @@ export class Emitter {
             node.parameters
                 .filter(e => e.dotDotDotToken)
                 .forEach(element => {
-                    this.processType(element.type, false);
+                    this.processType(element.type);
                     this.writer.writeString(' ');
                     this.processExpression(<ts.Identifier>element.name);
                     this.writer.writeString(' = ');
-                    this.processType(element.type, false);
+                    this.processType(element.type);
                     this.writer.writeString('{');
                     this.processExpression(<ts.Identifier>element.name);
                     this.writer.writeStringNewLine('_...};');
@@ -3386,7 +3386,7 @@ export class Emitter {
         if (!isTuple) {
             this.writer.writeString('array<');
             if (elementsType) {
-                this.processType(elementsType, false);
+                this.processType(elementsType);
             } else {
                 this.writer.writeString('any');
             }
