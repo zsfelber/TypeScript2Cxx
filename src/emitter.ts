@@ -440,7 +440,9 @@ export class Emitter {
                 this.processInclude(s);
             });
 
-            sourceFile.statements.filter(s => this.isDeclarationStatement(s)).forEach(s => {
+            let cnt=0;
+            sourceFile.statements.filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s)).forEach(s => {
+                this.writer.writeStringNewLine("// 1) forward decl "+(cnt++)+":");
                 this.processForwardDeclaration(s);
             });
 
@@ -448,13 +450,16 @@ export class Emitter {
                 this.writer.writeStringNewLine();
             }
 
+            cnt=0;
             sourceFile.statements
                 .map(v => this.preprocessor.preprocessStatement(v))
                 .filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s))
                 .forEach(s => {
                     if (this.isVariableStatement(s)) {
+                        this.writer.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
                         this.processForwardDeclaration(s);
                     } else {
+                        this.writer.writeStringNewLine("// 2) statement "+(cnt++)+":");
                         this.processStatement(s);
                     }
                 });
@@ -1098,6 +1103,7 @@ export class Emitter {
     }
 
     private processEnumForwardDeclaration(node: ts.EnumDeclaration): void {
+        this.writer.writeStringNewLine("// Module");
         this.scope.push(node);
         this.processEnumForwardDeclarationInternal(node);
         this.scope.pop();
@@ -1111,6 +1117,7 @@ export class Emitter {
 
         this.writer.writeString('enum struct ');
         this.processIdentifier(node.name);
+        this.writer.writeString(' : std::size_t ');
         this.writer.EndOfStatement();
     }
 
@@ -1180,14 +1187,14 @@ export class Emitter {
 
             w1.writeString('enum struct ');
             w1.writeString(id);
-            w1.writeString(" ");
+            w1.writeString(" : std::size_t ");
             w1.BeginBlock();
 
             w02.writeString('struct Enum_');
             w02.writeString(id);
             w02.writeString(" ");
             w02.BeginBlock();
-            w02.writeString('inline static js::string[] names() ');
+            w02.writeString('inline static js::string* names() ');
             w02.BeginBlock();
             w02.writeStringNewLine('static bool initialized=false;');
             w02.writeString('static js::string result[');
@@ -1241,13 +1248,11 @@ export class Emitter {
                                 break;
                             case ts.SyntaxKind.StringLiteral: 
                                 w2_ok = true;
-                                if (next) {
-                                    w2.EndOfStatement();
-                                }
-                                w2.writeString("result[");
+                                w2.writeString("result[(std::size_t)");
                                 w2.writeString(id);
                                 w2.writeString("::"+name+"] = ");
                                 w2.writeString(output);
+                                w2.EndOfStatement();
                                 idCnt++;
                                 break;
                             default:
@@ -1261,14 +1266,12 @@ export class Emitter {
                 }
                 if (!w2_ok) {
                     w2_ok = true;
-                    if (next) {
-                        w2.EndOfStatement();
-                    }
-                    w2.writeString("result[");
+                    w2.writeString("result[(std::size_t)");
                     w2.writeString(id);
                     w2.writeString("::"+name+"] = \"");
                     w2.writeString(name);
                     w2.writeString("\"");
+                    w2.EndOfStatement();
                 }
 
                 next = true;
@@ -1283,7 +1286,7 @@ export class Emitter {
 
             w2.writeString('inline static js::string const & name('+id+' value) ');
             w2.BeginBlock();
-            w2.writeStringNewLine('return Enum_'+id+"::names()[value];");
+            w2.writeStringNewLine('return Enum_'+id+"::names()[(std::size_t)value];");
             w2.EndBlock();
 
             w2.EndBlock();
@@ -1315,12 +1318,14 @@ export class Emitter {
     }
 
     private processVariablesForwardDeclaration(node: ts.VariableStatement) {
+        this.writer.writeStringNewLine("// Variables");
         if (this.processVariableDeclarationList(node.declarationList, true)) {
             this.writer.EndOfStatement();
         }
     }
 
     private processClassForwardDeclaration(node: ts.ClassDeclaration) {
+        this.writer.writeStringNewLine("// Class");
         this.scope.push(node);
         this.processClassForwardDeclarationInternal(node);
         this.scope.pop();
@@ -1346,6 +1351,7 @@ export class Emitter {
     }
 
     private processModuleForwardDeclaration(node: ts.ModuleDeclaration, template?: boolean) {
+        this.writer.writeStringNewLine("// Module");
         this.scope.push(node);
         this.processModuleForwardDeclarationInternal(node, template);
         this.scope.pop();
