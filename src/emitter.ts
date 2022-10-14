@@ -482,8 +482,9 @@ export class Emitter {
                 .filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s))
                 .forEach(s => {
                     if (this.isVariableStatement(s)) {
-                        this.writer.writeStringNewLine("// 3) forward decl "+(cnt++)+":");
-                        this.processForwardDeclaration(s);
+                        // already done 2)
+                        //this.writer.writeStringNewLine("// 3) forward decl "+(cnt++)+":");
+                        //this.processForwardDeclaration(s);
                     } else {
                         this.writer.writeStringNewLine("// 3) statement "+(cnt++)+":");
                         this.processStatement(s);
