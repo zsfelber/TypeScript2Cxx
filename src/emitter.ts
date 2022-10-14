@@ -16,8 +16,16 @@ class ReturnStatement {
     }
 }
 
+interface EmitFiles {
+    rootFolder: string;
+    fileNameHeader:string;
+    fileNameHeader_pre:string;
+    fileNameCpp:string;
+}
+
 export class Emitter {
     public writer: CodeWriter;
+    public writer_predecl: CodeWriter;
     private resolver: IdentifierResolver;
     private preprocessor: Preprocessor;
     private typeChecker: ts.TypeChecker;
@@ -30,9 +38,11 @@ export class Emitter {
 
     public constructor(
         typeChecker: ts.TypeChecker, private options: ts.CompilerOptions,
-        private cmdLineOptions: any, private singleModule: boolean, private rootFolder?: string) {
+        private cmdLineOptions: any, private singleModule: boolean,
+        private emitFiles:EmitFiles) {
 
         this.writer = new CodeWriter();
+        this.writer_predecl = new CodeWriter();
         this.typeChecker = typeChecker;
         this.resolver = new IdentifierResolver(typeChecker);
         this.preprocessor = new Preprocessor(this.resolver, this);
@@ -417,11 +427,37 @@ export class Emitter {
 
 
         if (this.isHeader()) {
+
+            let ow = this.writer;
+            try {
+                this.writer = this.writer_predecl;
+
+                this.WriteHeader(true);
+
+                this.processHeaderFileIncludes(sourceFile, true);
+
+                this.processHeaderFilePredecls(sourceFile);
+
+                // end of header
+                this.writer.writeStringNewLine(`#endif`);
+
+            } finally {
+                this.writer = ow;
+            }
+
+
             // added header
             this.WriteHeader();
 
-            this.processHeaderFileIncludes(sourceFile);
+            this.processHeaderFileIncludes(sourceFile, false);
 
+            this.writer.writeStringNewLine('');
+            // self predecl !
+            this.writer.writeStringNewLine('#include "'+this.emitFiles.fileNameHeader_pre+'"');
+            this.writer.writeStringNewLine('');
+            this.writer.writeStringNewLine('using namespace js;');
+            this.writer.writeStringNewLine('');
+    
             let cnt=0;
             sourceFile.statements
                 .map(v => this.preprocessor.preprocessStatement(v))
@@ -534,12 +570,11 @@ export class Emitter {
                 this.writer = ow;
             }
         });
+    }
 
-        this.writer.writeStringNewLine('');
-        this.writer.writeStringNewLine('using namespace js;');
-        this.writer.writeStringNewLine('');
+    private processHeaderFilePredecls(sourceFile: ts.SourceFile): void {
 
-        const position = this.writer.newSection();
+        //const position = this.writer.newSection();
 
         /*cnt=0;
         sourceFile.statements.filter(s => this.isDeclarationStatement(s)).forEach(s => {
@@ -550,7 +585,7 @@ export class Emitter {
             }
         });*/
 
-        cnt=0;
+        let cnt=0;
         sourceFile.statements.filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s)).forEach(s => {
             let ow = this.writer;
             try {
@@ -566,20 +601,26 @@ export class Emitter {
 
         });
 
-        if (this.writer.hasAnyContent(position)) {
+        /*if (this.writer.hasAnyContent(position)) {
             this.writer.writeStringNewLine();
-        }
+        }*/
     }
 
-    private WriteHeader() {
-        const filePath = Helpers.getSubPath(Helpers.cleanUpPath(this.sourceFileName), Helpers.cleanUpPath(this.rootFolder));
+    private WriteHeader(predecl = false) {
+        const filePath = Helpers.getSubPath(Helpers.cleanUpPath(this.sourceFileName), Helpers.cleanUpPath(this.emitFiles.rootFolder));
         if (this.isSource()) {
             this.writer.writeStringNewLine(`#include "${filePath.replace(/\.ts$/, '.h')}"`);
         } else {
-            const headerName = filePath.replace(/\.ts$/, '_h').replace(/[\\\/\.]/g, '_').toUpperCase();
+            let headerName = filePath.replace(/\.ts$/, '').replace(/[\\\/\.]/g, '_').toUpperCase();
+            if (predecl)
+                headerName += "_PRE_H";
+            else
+                headerName += "_H";
             this.writer.writeStringNewLine(`#ifndef ${headerName}`);
             this.writer.writeStringNewLine(`#define ${headerName}`);
-            this.writer.writeStringNewLine(`#include "cpplib/core.h"`);
+
+            if (!predecl)
+                this.writer.writeStringNewLine(`#include "cpplib/core.h"`);
         }
     }
 
@@ -759,7 +800,7 @@ export class Emitter {
             case ts.SyntaxKind.ClassDeclaration: this.processClassForwardDeclaration(<ts.ClassDeclaration>node); return;
             case ts.SyntaxKind.ModuleDeclaration: this.processModuleForwardDeclaration(<ts.ModuleDeclaration>node); return;
             case ts.SyntaxKind.EnumDeclaration: this.processEnumForwardDeclaration(<ts.EnumDeclaration>node); return;
-            case ts.SyntaxKind.TypeAliasDeclaration: this.processTypeAliasDeclaration(<ts.TypeAliasDeclaration>node, false); return;
+            case ts.SyntaxKind.TypeAliasDeclaration: this.processTypeAliasDeclaration(<ts.TypeAliasDeclaration>node, true); return;
             default:
                 return;
         }
@@ -1651,13 +1692,13 @@ export class Emitter {
         return false;
     }
 
-    private processTypeAliasDeclaration(node: ts.TypeAliasDeclaration, checkImport=true): void {
+    private processTypeAliasDeclaration(node: ts.TypeAliasDeclaration, predecl=false): void {
         if (this.isDeclare(node)) {
             return;
         }
 
-        if (checkImport && node.type.kind === ts.SyntaxKind.ImportType) {
-            this.processTypeAliasImportDeclaration(node);
+        if (!predecl && node.type.kind === ts.SyntaxKind.ImportType) {
+            this.processTypeAliasImportDeclaration(node, false);
             return;
         }
 
