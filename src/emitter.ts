@@ -449,11 +449,12 @@ export class Emitter {
             // added header
             this.WriteHeader();
 
+            this.writer.writeStringNewLine('');
+            // self predecl first!
+            this.writer.writeStringNewLine('#include "'+this.emitFiles.fileNameHeader_pre+'"');
+            this.writer.writeStringNewLine('');
             this.processHeaderFileIncludes(sourceFile, false);
 
-            this.writer.writeStringNewLine('');
-            // self predecl !
-            this.writer.writeStringNewLine('#include "'+this.emitFiles.fileNameHeader_pre+'"');
             this.writer.writeStringNewLine('');
             this.writer.writeStringNewLine('using namespace js;');
             this.writer.writeStringNewLine('');
@@ -468,7 +469,7 @@ export class Emitter {
                         //this.writer.writeStringNewLine("// 3) forward decl "+(cnt++)+":");
                         //this.processForwardDeclaration(s);
                     } else {
-                        this.writer.writeStringNewLine("// 3) statement "+(cnt++)+":");
+                        //this.writer.writeStringNewLine("// 3) statement "+(cnt++)+":");
                         this.processStatement(s);
                     }
                 });
@@ -563,7 +564,7 @@ export class Emitter {
                 this.writer = new CodeWriter();
                 this.processInclude(s, predecl);
                 if (this.writer.getText()) {
-                    ow.writeStringNewLine("// 1) include "+(cnt++)+":");
+                    //ow.writeStringNewLine("// 1) include "+(cnt++)+":");
                     ow.writeString(this.writer.getText());
                 }
             } finally {
@@ -592,7 +593,7 @@ export class Emitter {
                 this.writer = new CodeWriter();
                 this.processForwardDeclaration2(s);
                 if (this.writer.getText()) {
-                    ow.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
+                    //ow.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
                     ow.writeString(this.writer.getText());
                 }
             } finally {
