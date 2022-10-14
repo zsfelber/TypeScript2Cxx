@@ -617,12 +617,17 @@ export class Emitter {
         throw new Error('Method not implemented.');
     }
 
+    deep_expression=0;
+
     private processExpression(nodeIn: ts.Expression): ts.Expression {
         const node = this.preprocessor.preprocessExpression(nodeIn);
         if (!node) {
             return node;
         }
+        
+        this.deep_expression++;
 
+        try {
         // we need to process it for statements only
         //// this.functionContext.code.setNodeToTrackDebugInfo(node, this.sourceMapGenerator);
 
@@ -663,7 +668,9 @@ export class Emitter {
             case ts.SyntaxKind.Identifier: this.processIdentifier(<ts.Identifier>node); return node;
             case ts.SyntaxKind.ComputedPropertyName: this.processComputedPropertyName(<ts.ComputedPropertyName><any>node); return node;
         }
-
+        } finally {
+            this.deep_expression--;
+        }
         // TODO: finish it
         throw new Error('Method not implemented.');
     }
@@ -3592,13 +3599,39 @@ export class Emitter {
         } else {
             let isWriting = false;
             let dereference = true;
-            if (node.parent.kind === ts.SyntaxKind.BinaryExpression) {
-                const binaryExpression = <ts.BinaryExpression>node.parent;
-                isWriting = binaryExpression.operatorToken.kind === ts.SyntaxKind.EqualsToken
-                    && binaryExpression.left === node;
+            switch (node.parent.kind) {
+                case ts.SyntaxKind.BinaryExpression: {
+                    const binaryExpression = <ts.BinaryExpression>node.parent;
+                    switch (binaryExpression.operatorToken.kind) {
+                        case ts.SyntaxKind.EqualsToken:
+                        case ts.SyntaxKind.BarEqualsToken:
+                        case ts.SyntaxKind.PlusEqualsToken:
+                        case ts.SyntaxKind.CaretEqualsToken:
+                        case ts.SyntaxKind.MinusEqualsToken:
+                        case ts.SyntaxKind.SlashEqualsToken:
+                        case ts.SyntaxKind.PercentEqualsToken:
+                        case ts.SyntaxKind.AsteriskEqualsToken:
+                        case ts.SyntaxKind.AmpersandEqualsToken:
+                        case ts.SyntaxKind.AsteriskAsteriskEqualsToken:
+                            isWriting = binaryExpression.left === node;
+                            break;
+                    }
+                    break;
+                }
+                case ts.SyntaxKind.PrefixUnaryExpression: 
+                case ts.SyntaxKind.PostfixUnaryExpression: {
+                    const unaryExpression = <ts.PrefixUnaryExpression|ts.PostfixUnaryExpression>node.parent;
+                    switch (unaryExpression.operator) {
+                        case ts.SyntaxKind.PlusPlusToken:
+                        case ts.SyntaxKind.MinusMinusToken:
+                            isWriting = true;
+                            break;
+                    }
+                    break;
+                }
             }
 
-            dereference = type
+            /*dereference = type
                 && type.kind !== ts.SyntaxKind.TypeLiteral
                 && type.kind !== ts.SyntaxKind.StringKeyword
                 && type.kind !== ts.SyntaxKind.ArrayType
@@ -3609,6 +3642,10 @@ export class Emitter {
                 && (!(<ts.ParameterDeclaration>symbolInfo.valueDeclaration).dotDotDotToken)
                 && (<any>symbolInfo.valueDeclaration).initializer
                 && (<any>symbolInfo.valueDeclaration).initializer.kind !== ts.SyntaxKind.ObjectLiteralExpression;
+            */
+
+            dereference = true;
+
             if (dereference) {
                 this.writer.writeString('(*');
             }
@@ -3894,7 +3931,10 @@ export class Emitter {
             }
         }
 
-        if (node.parent.kind === ts.SyntaxKind.PropertyAccessExpression) {
+        if (node.parent.kind === ts.SyntaxKind.PropertyAccessExpression ||
+            node.parent.kind === ts.SyntaxKind.ElementAccessExpression
+            ) {
+
             this.writer.writeString('this');
         } else if (method.kind === ts.SyntaxKind.Constructor) {
             this.writer.writeString('_this');
