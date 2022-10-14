@@ -420,63 +420,9 @@ export class Emitter {
             // added header
             this.WriteHeader();
 
-            sourceFile.referencedFiles.forEach(f => {
-                this.writer.writeString('#include \"');
-                this.writer.writeString(f.fileName.replace('.d.ts', ''));
-                this.writer.writeStringNewLine('.h\"');
-            });
+            this.processHeaderFileIncludes(sourceFile);
 
             let cnt=0;
-            sourceFile.statements.filter(s => this.isImportStatement(s)||this.isDeclarationStatement(s)).forEach(s => {
-                let ow = this.writer;
-                try {
-                    this.writer = new CodeWriter();
-                    this.processInclude(s);
-                    if (this.writer.getText()) {
-                        ow.writeStringNewLine("// 1) include "+(cnt++)+":");
-                        ow.writeString(this.writer.getText());
-                    }
-                } finally {
-                    this.writer = ow;
-                }
-            });
-
-            this.writer.writeStringNewLine('');
-            this.writer.writeStringNewLine('using namespace js;');
-            this.writer.writeStringNewLine('');
-
-            const position = this.writer.newSection();
-
-            /*cnt=0;
-            sourceFile.statements.filter(s => this.isDeclarationStatement(s)).forEach(s => {
-                const node = this.preprocessor.preprocessStatement(<ts.Statement>s);
-                if (node.kind==ts.SyntaxKind.TypeAliasDeclaration) {
-                    this.writer.writeStringNewLine("// 2) type alias "+(cnt++)+":");
-                    this.processTypeAliasDeclaration(<ts.TypeAliasDeclaration>node, false);
-                }
-            });*/
-
-            cnt=0;
-            sourceFile.statements.filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s)).forEach(s => {
-                let ow = this.writer;
-                try {
-                    this.writer = new CodeWriter();
-                    this.processForwardDeclaration2(s);
-                    if (this.writer.getText()) {
-                        ow.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
-                        ow.writeString(this.writer.getText());
-                    }
-                } finally {
-                    this.writer = ow;
-                }
-
-            });
-
-            if (this.writer.hasAnyContent(position)) {
-                this.writer.writeStringNewLine();
-            }
-
-            cnt=0;
             sourceFile.statements
                 .map(v => this.preprocessor.preprocessStatement(v))
                 .filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s))
@@ -562,6 +508,66 @@ export class Emitter {
         if (this.isHeader()) {
             // end of header
             this.writer.writeStringNewLine(`#endif`);
+        }
+    }
+
+    private processHeaderFileIncludes(sourceFile: ts.SourceFile, predecl: boolean): void {
+        sourceFile.referencedFiles.forEach(f => {
+            this.writer.writeString('#include \"');
+            this.writer.writeString(f.fileName.replace('.d.ts', ''));
+            if (predecl)
+                this.writer.writeString("_pre");
+            this.writer.writeStringNewLine('.h\"');
+        });
+
+        let cnt=0;
+        sourceFile.statements.filter(s => this.isImportStatement(s)||this.isDeclarationStatement(s)).forEach(s => {
+            let ow = this.writer;
+            try {
+                this.writer = new CodeWriter();
+                this.processInclude(s, predecl);
+                if (this.writer.getText()) {
+                    ow.writeStringNewLine("// 1) include "+(cnt++)+":");
+                    ow.writeString(this.writer.getText());
+                }
+            } finally {
+                this.writer = ow;
+            }
+        });
+
+        this.writer.writeStringNewLine('');
+        this.writer.writeStringNewLine('using namespace js;');
+        this.writer.writeStringNewLine('');
+
+        const position = this.writer.newSection();
+
+        /*cnt=0;
+        sourceFile.statements.filter(s => this.isDeclarationStatement(s)).forEach(s => {
+            const node = this.preprocessor.preprocessStatement(<ts.Statement>s);
+            if (node.kind==ts.SyntaxKind.TypeAliasDeclaration) {
+                this.writer.writeStringNewLine("// 2) type alias "+(cnt++)+":");
+                this.processTypeAliasDeclaration(<ts.TypeAliasDeclaration>node, false);
+            }
+        });*/
+
+        cnt=0;
+        sourceFile.statements.filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s)).forEach(s => {
+            let ow = this.writer;
+            try {
+                this.writer = new CodeWriter();
+                this.processForwardDeclaration2(s);
+                if (this.writer.getText()) {
+                    ow.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
+                    ow.writeString(this.writer.getText());
+                }
+            } finally {
+                this.writer = ow;
+            }
+
+        });
+
+        if (this.writer.hasAnyContent(position)) {
+            this.writer.writeStringNewLine();
         }
     }
 
@@ -715,14 +721,14 @@ export class Emitter {
         throw new Error('Method not implemented.');
     }
 
-    private processInclude(nodeIn: ts.Declaration | ts.Statement): void {
+    private processInclude(nodeIn: ts.Declaration | ts.Statement, predecl: boolean): void {
 
         const node = this.preprocessor.preprocessStatement(<ts.Statement>nodeIn);
 
         switch (node.kind) {
-            case ts.SyntaxKind.TypeAliasDeclaration: this.processTypeAliasImportDeclaration(<ts.TypeAliasDeclaration>node); return;
-            case ts.SyntaxKind.ImportDeclaration: this.processImportDeclaration(<ts.ImportDeclaration>node); return;
-            case ts.SyntaxKind.ExportDeclaration: this.processExportDeclaration(<ts.ExportDeclaration>node); return;
+            case ts.SyntaxKind.TypeAliasDeclaration: this.processTypeAliasImportDeclaration(<ts.TypeAliasDeclaration>node, predecl); return;
+            case ts.SyntaxKind.ImportDeclaration: this.processImportDeclaration(<ts.ImportDeclaration>node, predecl); return;
+            case ts.SyntaxKind.ExportDeclaration: this.processExportDeclaration(<ts.ExportDeclaration>node, predecl); return;
             default:
                 return;
         }
@@ -1621,7 +1627,7 @@ export class Emitter {
         });
     }
 
-    private processTypeAliasImportDeclaration(node: ts.TypeAliasDeclaration): boolean {
+    private processTypeAliasImportDeclaration(node: ts.TypeAliasDeclaration, predecl: boolean): boolean {
         if (this.isDeclare(node)) {
             return;
         }
@@ -1633,6 +1639,8 @@ export class Emitter {
                 const literal = <ts.LiteralTypeNode>argument;
                 this.writer.writeString('#include \"');
                 this.writer.writeString((<any>literal.literal).text);
+                if (predecl)
+                    this.writer.writeString("_pre");
                 this.writer.writeStringNewLine('.h\"');
             } else {
                 throw new Error('Not Implemented');
@@ -1790,23 +1798,25 @@ export class Emitter {
         this.processExpression(node.right);
     }
 
-    private processExportDeclaration(node: ts.ExportDeclaration): void {
+    private processExportDeclaration(node: ts.ExportDeclaration, predecl: boolean): void {
         this.writer.writeString('#include \"');
         if (node.moduleSpecifier.kind === ts.SyntaxKind.StringLiteral) {
             const ident = <ts.StringLiteral>node.moduleSpecifier;
             if (ident.text==".") {
-                this.writer.writeString("./index.h");
+                this.writer.writeString("./index");
             } else {
                 this.writer.writeString(ident.text);
-                this.writer.writeString('.h');
             }
+            if (predecl)
+                this.writer.writeString("_pre");
+            this.writer.writeString('.h');
         }
 
         this.writer.writeStringNewLine('\"');
         /* TODO: ?*/
     }
 
-    private processImportDeclaration(node: ts.ImportDeclaration): void {
+    private processImportDeclaration(node: ts.ImportDeclaration, predecl: boolean): void {
 
         if (node.moduleSpecifier.kind !== ts.SyntaxKind.StringLiteral) {
             return;
@@ -1816,11 +1826,13 @@ export class Emitter {
         if (node.moduleSpecifier.kind === ts.SyntaxKind.StringLiteral) {
             const ident = <ts.StringLiteral>node.moduleSpecifier;
             if (ident.text==".") {
-                this.writer.writeString("./index.h");
+                this.writer.writeString("./index");
             } else {
                 this.writer.writeString(ident.text);
-                this.writer.writeString('.h');
             }
+            if (predecl)
+                this.writer.writeString("_pre");
+            this.writer.writeString('.h');
         }
 
         this.writer.writeStringNewLine('\"');
