@@ -3431,10 +3431,10 @@ export class Emitter {
         const hasSpreadAssignment = node.properties.some(e => e.kind === ts.SyntaxKind.SpreadAssignment);
 
         if (hasSpreadAssignment) {
-            this.writer.writeString('utils::assign(');
+            this.writer.writeString('(utils::assign(');
             this.writer.writeString('new object()');
         } else {
-            this.writer.writeString('new object(');
+            this.writer.writeString('(new object(');
         }
 
         if (node.properties.length !== 0) {
@@ -3489,8 +3489,6 @@ export class Emitter {
             });
 
             this.writer.EndBlock(true);
-        } else {
-            //this.writer.writeString('{}');
         }
 
         if (hasSpreadAssignment) {
@@ -3502,7 +3500,7 @@ export class Emitter {
                 }
             });
         }
-        this.writer.writeString(')->shared_from_this()');
+        this.writer.writeString('))->shared_from_this()');
     }
 
     private processComputedPropertyName(node: ts.ComputedPropertyName): void {
