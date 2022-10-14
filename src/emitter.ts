@@ -2075,7 +2075,7 @@ export class Emitter {
                 break;
             case ts.SyntaxKind.TypeLiteral:
             case ts.SyntaxKind.ObjectLiteralExpression:
-                this.writer.writeString('object');
+                this.writer.writeString('std::shared_ptr<object>');
                 break;
             case ts.SyntaxKind.ArrayType:
                 const arrayType = <ts.ArrayTypeNode>type;
@@ -3432,9 +3432,11 @@ export class Emitter {
 
         if (hasSpreadAssignment) {
             this.writer.writeString('utils::assign(');
+            this.writer.writeString('new object()');
+        } else {
+            this.writer.writeString('new object(');
         }
 
-        this.writer.writeString('object');
         if (node.properties.length !== 0) {
             this.writer.BeginBlock();
             node.properties.forEach(element => {
@@ -3488,7 +3490,7 @@ export class Emitter {
 
             this.writer.EndBlock(true);
         } else {
-            this.writer.writeString('{}');
+            //this.writer.writeString('{}');
         }
 
         if (hasSpreadAssignment) {
@@ -3499,8 +3501,8 @@ export class Emitter {
                     this.processExpression(spreadAssignment.expression);
                 }
             });
-            this.writer.writeString(')');
         }
+        this.writer.writeString(')->shared_from_this()');
     }
 
     private processComputedPropertyName(node: ts.ComputedPropertyName): void {
@@ -4091,12 +4093,12 @@ export class Emitter {
                 this.writer.writeString(')');
             }
 
-            if (this.resolver.isAnyLikeType(typeInfo)) {
+            /*if (this.resolver.isAnyLikeType(typeInfo)) {
                 this.writer.writeString('["');
                 this.processExpression(<ts.Identifier>node.name);
                 this.writer.writeString('"]');
                 return;
-            } else if (this.resolver.isStaticAccess(typeInfo)
+            } else */if (this.resolver.isStaticAccess(typeInfo)
                 || node.expression.kind === ts.SyntaxKind.SuperKeyword
                 || typeInfo && typeInfo.symbol && typeInfo.symbol.valueDeclaration
                 && typeInfo.symbol.valueDeclaration.kind === ts.SyntaxKind.ModuleDeclaration) {
