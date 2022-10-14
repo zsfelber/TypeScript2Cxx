@@ -426,7 +426,9 @@ export class Emitter {
                 this.writer.writeStringNewLine('.h\"');
             });
 
-            sourceFile.statements.filter(s => this.isImportStatement(s)).forEach(s => {
+            let cnt=0;
+            sourceFile.statements.filter(s => this.isImportStatement(s)||this.isDeclarationStatement(s)).forEach(s => {
+                this.writer.writeStringNewLine("// 1) include "+(cnt++)+":");
                 this.processInclude(s);
             });
 
@@ -436,14 +438,19 @@ export class Emitter {
 
             const position = this.writer.newSection();
 
+            /*cnt=0;
             sourceFile.statements.filter(s => this.isDeclarationStatement(s)).forEach(s => {
-                this.processInclude(s);
-            });
+                const node = this.preprocessor.preprocessStatement(<ts.Statement>s);
+                if (node.kind==ts.SyntaxKind.TypeAliasDeclaration) {
+                    this.writer.writeStringNewLine("// 2) type alias "+(cnt++)+":");
+                    this.processTypeAliasDeclaration(<ts.TypeAliasDeclaration>node, false);
+                }
+            });*/
 
-            let cnt=0;
+            cnt=0;
             sourceFile.statements.filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s)).forEach(s => {
-                this.writer.writeStringNewLine("// 1) forward decl "+(cnt++)+":");
-                this.processForwardDeclaration(s);
+                this.writer.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
+                this.processForwardDeclaration2(s);
             });
 
             if (this.writer.hasAnyContent(position)) {
@@ -456,10 +463,10 @@ export class Emitter {
                 .filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s))
                 .forEach(s => {
                     if (this.isVariableStatement(s)) {
-                        this.writer.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
+                        this.writer.writeStringNewLine("// 3) forward decl "+(cnt++)+":");
                         this.processForwardDeclaration(s);
                     } else {
-                        this.writer.writeStringNewLine("// 2) statement "+(cnt++)+":");
+                        this.writer.writeStringNewLine("// 3) statement "+(cnt++)+":");
                         this.processStatement(s);
                     }
                 });
@@ -686,7 +693,7 @@ export class Emitter {
         const node = this.preprocessor.preprocessStatement(<ts.Statement>nodeIn);
 
         switch (node.kind) {
-            case ts.SyntaxKind.TypeAliasDeclaration: this.processTypeAliasDeclaration(<ts.TypeAliasDeclaration>node); return;
+            case ts.SyntaxKind.TypeAliasDeclaration: this.processTypeAliasImportDeclaration(<ts.TypeAliasDeclaration>node); return;
             case ts.SyntaxKind.ImportDeclaration: this.processImportDeclaration(<ts.ImportDeclaration>node); return;
             case ts.SyntaxKind.ExportDeclaration: this.processExportDeclaration(<ts.ExportDeclaration>node); return;
             default:
@@ -704,6 +711,22 @@ export class Emitter {
             case ts.SyntaxKind.ClassDeclaration: this.processClassForwardDeclaration(<ts.ClassDeclaration>node); return;
             case ts.SyntaxKind.ModuleDeclaration: this.processModuleForwardDeclaration(<ts.ModuleDeclaration>node); return;
             case ts.SyntaxKind.EnumDeclaration: this.processEnumForwardDeclaration(<ts.EnumDeclaration>node); return;
+            default:
+                return;
+        }
+    }
+
+    private processForwardDeclaration2(nodeIn: ts.Declaration | ts.Statement): void {
+
+        const node = this.preprocessor.preprocessStatement(<ts.Statement>nodeIn);
+
+        switch (node.kind) {
+            case ts.SyntaxKind.VariableStatement: this.processVariablesForwardDeclaration(<ts.VariableStatement>node); return;
+            case ts.SyntaxKind.InterfaceDeclaration:
+            case ts.SyntaxKind.ClassDeclaration: this.processClassForwardDeclaration(<ts.ClassDeclaration>node); return;
+            case ts.SyntaxKind.ModuleDeclaration: this.processModuleForwardDeclaration(<ts.ModuleDeclaration>node); return;
+            case ts.SyntaxKind.EnumDeclaration: this.processEnumForwardDeclaration(<ts.EnumDeclaration>node); return;
+            case ts.SyntaxKind.TypeAliasDeclaration: this.processTypeAliasDeclaration(<ts.TypeAliasDeclaration>node, false); return;
             default:
                 return;
         }
@@ -1571,8 +1594,7 @@ export class Emitter {
         });
     }
 
-    private processTypeAliasDeclaration(node: ts.TypeAliasDeclaration): void {
-
+    private processTypeAliasImportDeclaration(node: ts.TypeAliasDeclaration): boolean {
         if (this.isDeclare(node)) {
             return;
         }
@@ -1589,6 +1611,18 @@ export class Emitter {
                 throw new Error('Not Implemented');
             }
 
+            return true;
+        }
+        return false;
+    }
+
+    private processTypeAliasDeclaration(node: ts.TypeAliasDeclaration, checkImport=true): void {
+        if (this.isDeclare(node)) {
+            return;
+        }
+
+        if (checkImport && node.type.kind === ts.SyntaxKind.ImportType) {
+            this.processTypeAliasImportDeclaration(node);
             return;
         }
 
