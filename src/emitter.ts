@@ -428,8 +428,17 @@ export class Emitter {
 
             let cnt=0;
             sourceFile.statements.filter(s => this.isImportStatement(s)||this.isDeclarationStatement(s)).forEach(s => {
-                this.writer.writeStringNewLine("// 1) include "+(cnt++)+":");
-                this.processInclude(s);
+                let ow = this.writer;
+                try {
+                    this.writer = new CodeWriter();
+                    this.processInclude(s);
+                    if (this.writer.getText()) {
+                        ow.writeStringNewLine("// 1) include "+(cnt++)+":");
+                        ow.writeString(this.writer.getText());
+                    }
+                } finally {
+                    this.writer = ow;
+                }
             });
 
             this.writer.writeStringNewLine('');
@@ -449,8 +458,18 @@ export class Emitter {
 
             cnt=0;
             sourceFile.statements.filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s)).forEach(s => {
-                this.writer.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
-                this.processForwardDeclaration2(s);
+                let ow = this.writer;
+                try {
+                    this.writer = new CodeWriter();
+                    this.processForwardDeclaration2(s);
+                    if (this.writer.getText()) {
+                        ow.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
+                        ow.writeString(this.writer.getText());
+                    }
+                } finally {
+                    this.writer = ow;
+                }
+
             });
 
             if (this.writer.hasAnyContent(position)) {
