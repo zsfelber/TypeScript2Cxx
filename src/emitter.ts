@@ -4134,6 +4134,11 @@ export class Emitter {
                         return false;
                     }
                     return true;
+                case ts.SyntaxKind.NewExpression:
+                    if ((<ts.NewExpression>(node.parent)).expression===node) {
+                        return false;
+                    }
+                    return true;
                 default:
                     return true;
             }
