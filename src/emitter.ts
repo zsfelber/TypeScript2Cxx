@@ -3660,8 +3660,9 @@ export class Emitter {
 
     private processElementAccessExpression(node: ts.ElementAccessExpression): void {
 
-        const symbolInfo = this.resolver.getSymbolAtLocation(node.expression);
-        const type = this.resolver.typeToTypeNode(this.resolver.getOrResolveTypeOf(node.expression));
+        //const symbolInfo = this.resolver.getSymbolAtLocation(node.expression);
+        const typeInfo = this.resolver.getOrResolveTypeOf(node.expression);
+        const type = this.resolver.typeToTypeNode(typeInfo);
         if (type && type.kind === ts.SyntaxKind.TupleType) {
             // tuple
             if (node.argumentExpression.kind !== ts.SyntaxKind.NumericLiteral) {
@@ -3675,39 +3676,6 @@ export class Emitter {
             this.processExpression(node.expression);
             this.writer.writeString(')');
         } else {
-            let isWriting = false;
-            let dereference = true;
-            switch (node.parent.kind) {
-                case ts.SyntaxKind.BinaryExpression: {
-                    const binaryExpression = <ts.BinaryExpression>node.parent;
-                    switch (binaryExpression.operatorToken.kind) {
-                        case ts.SyntaxKind.EqualsToken:
-                        case ts.SyntaxKind.BarEqualsToken:
-                        case ts.SyntaxKind.PlusEqualsToken:
-                        case ts.SyntaxKind.CaretEqualsToken:
-                        case ts.SyntaxKind.MinusEqualsToken:
-                        case ts.SyntaxKind.SlashEqualsToken:
-                        case ts.SyntaxKind.PercentEqualsToken:
-                        case ts.SyntaxKind.AsteriskEqualsToken:
-                        case ts.SyntaxKind.AmpersandEqualsToken:
-                        case ts.SyntaxKind.AsteriskAsteriskEqualsToken:
-                            isWriting = binaryExpression.left === node;
-                            break;
-                    }
-                    break;
-                }
-                case ts.SyntaxKind.PrefixUnaryExpression: 
-                case ts.SyntaxKind.PostfixUnaryExpression: {
-                    const unaryExpression = <ts.PrefixUnaryExpression|ts.PostfixUnaryExpression>node.parent;
-                    switch (unaryExpression.operator) {
-                        case ts.SyntaxKind.PlusPlusToken:
-                        case ts.SyntaxKind.MinusMinusToken:
-                            isWriting = true;
-                            break;
-                    }
-                    break;
-                }
-            }
 
             /*dereference = type
                 && type.kind !== ts.SyntaxKind.TypeLiteral
@@ -3721,31 +3689,84 @@ export class Emitter {
                 && (<any>symbolInfo.valueDeclaration).initializer
                 && (<any>symbolInfo.valueDeclaration).initializer.kind !== ts.SyntaxKind.ObjectLiteralExpression;
             */
+            let isEnum = false;
+            let isWriting = false;
+            let isTypeId = type
+                && type.kind === ts.SyntaxKind.TypeQuery;
 
-            dereference = true;
-
-            if (dereference) {
+            if (isTypeId) {
+                isEnum = this.resolver.isTypeFromSymbol(typeInfo, ts.SyntaxKind.EnumDeclaration);
+                if (isEnum) {
+                    this.writer.writeString('Enum_');
+                }
+            } else {
                 this.writer.writeString('(*');
-            }
+                isWriting = this.isWritingExpression(node);
 
-            if (!isWriting) {
-                this.writer.writeString('const_(');
+                if (!isWriting) {
+                    this.writer.writeString('const_(');
+                }
             }
 
             this.processExpression(node.expression);
 
-            if (!isWriting) {
+            if (!isTypeId) {
+
+                if (!isWriting) {
+                    this.writer.writeString(')');
+                }
+
                 this.writer.writeString(')');
             }
 
-            if (dereference) {
+            if (isEnum) {
+                this.writer.writeString('::name(');
+                this.processExpression(node.argumentExpression);
                 this.writer.writeString(')');
+            } else {
+                this.writer.writeString('[');
+                this.processExpression(node.argumentExpression);
+                this.writer.writeString(']');
             }
-
-            this.writer.writeString('[');
-            this.processExpression(node.argumentExpression);
-            this.writer.writeString(']');
         }
+    }
+
+    private isWritingExpression(node: ts.Expression): boolean {
+
+        let isWriting = false;
+
+        switch (node.parent.kind) {
+            case ts.SyntaxKind.BinaryExpression: {
+                const binaryExpression = <ts.BinaryExpression>node.parent;
+                switch (binaryExpression.operatorToken.kind) {
+                    case ts.SyntaxKind.EqualsToken:
+                    case ts.SyntaxKind.BarEqualsToken:
+                    case ts.SyntaxKind.PlusEqualsToken:
+                    case ts.SyntaxKind.CaretEqualsToken:
+                    case ts.SyntaxKind.MinusEqualsToken:
+                    case ts.SyntaxKind.SlashEqualsToken:
+                    case ts.SyntaxKind.PercentEqualsToken:
+                    case ts.SyntaxKind.AsteriskEqualsToken:
+                    case ts.SyntaxKind.AmpersandEqualsToken:
+                    case ts.SyntaxKind.AsteriskAsteriskEqualsToken:
+                        isWriting = binaryExpression.left === node;
+                        break;
+                }
+                break;
+            }
+            case ts.SyntaxKind.PrefixUnaryExpression: 
+            case ts.SyntaxKind.PostfixUnaryExpression: {
+                const unaryExpression = <ts.PrefixUnaryExpression|ts.PostfixUnaryExpression>node.parent;
+                switch (unaryExpression.operator) {
+                    case ts.SyntaxKind.PlusPlusToken:
+                    case ts.SyntaxKind.MinusMinusToken:
+                        isWriting = true;
+                        break;
+                }
+                break;
+            }
+        }
+        return isWriting;
     }
 
     private processParenthesizedExpression(node: ts.ParenthesizedExpression) {
@@ -4085,25 +4106,91 @@ export class Emitter {
         this.writer.writeString('; })');
     }
 
+    private resolveIdentifierNamespace(node: ts.Identifier): ts.TypeNode {
+        const identifierSymbol = this.resolver.getSymbolAtLocation(node);
+        const valDecl = identifierSymbol && identifierSymbol.valueDeclaration;
+        if (valDecl) {
+            const containerParent = valDecl.parent.parent;
+            if (containerParent && this.isNamespaceStatement(containerParent)) {
+                const nstype = this.resolver.getOrResolveTypeOfAsTypeNode(containerParent);
+                return nstype;
+            }
+
+        }
+        return null;
+    }
+
+    private shouldBeConstructorReference(node: ts.Identifier, type: ts.TypeNode): boolean {
+            
+        if (node.parent) {
+            switch (node.parent.kind) {
+                case ts.SyntaxKind.ParenthesizedExpression:
+                    if ((<ts.ParenthesizedExpression>(node.parent)).expression===node) {
+                        return true;
+                    }
+                    return false;
+                case ts.SyntaxKind.TypeAssertionExpression:
+                    if ((<ts.TypeAssertion>(node.parent)).type===type) {
+                        return true;
+                    }
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    private resolveIsConstructorReference(node: ts.Identifier): boolean {
+ 
+        let result = false;
+ 
+        try {
+            const typeInfo = this.resolver.getOrResolveTypeOf(node);
+            const type = this.resolver.typeToTypeNode(typeInfo);
+
+            if (type) {
+                switch (type.kind) {
+                    case ts.SyntaxKind.TypeReference:
+                        break;
+                    case ts.SyntaxKind.TypeLiteral:
+                        break;
+                    case ts.SyntaxKind.TypeQuery:
+                        //this.writer.writeString('/*typequery:*/');
+                        result = this.shouldBeConstructorReference(node, type);
+                        break;
+                }
+            }
+        } catch (drop) {
+
+        }
+
+        return result;
+    }
+
     private processIdentifier(node: ts.Identifier): void {
 
-        if (this.isWritingMain) {
-            const isRightPartOfPropertyAccess = node.parent.kind === ts.SyntaxKind.QualifiedName
-                || node.parent.kind === ts.SyntaxKind.PropertyAccessExpression
-                    && (<ts.PropertyAccessExpression>(node.parent)).name === node;
-            if (!isRightPartOfPropertyAccess) {
-                const identifierSymbol = this.resolver.getSymbolAtLocation(node);
-                const valDecl = identifierSymbol && identifierSymbol.valueDeclaration;
-                if (valDecl) {
-                    const containerParent = valDecl.parent.parent;
-                    if (containerParent && this.isNamespaceStatement(containerParent)) {
-                        const type = this.resolver.getOrResolveTypeOfAsTypeNode(containerParent);
-                        if (type) {
-                            this.processType(type);
-                            this.writer.writeString('::');
-                        }
-                    }
+        const isRightPartOfPropertyAccess = node.parent.kind === ts.SyntaxKind.QualifiedName
+            || node.parent.kind === ts.SyntaxKind.PropertyAccessExpression
+                && (<ts.PropertyAccessExpression>(node.parent)).name === node;
+
+        let isConstructor = false;
+
+        if (!isRightPartOfPropertyAccess) {
+
+            let nstype: ts.TypeNode;
+
+            if (this.isWritingMain) {
+                nstype = this.resolveIdentifierNamespace(node);
+                if (nstype) {
+                    this.processType(nstype);
+                    this.writer.writeString('::');
                 }
+            }
+
+            if (!nstype) {
+                isConstructor = this.resolveIsConstructorReference(node);
             }
         }
 
@@ -4111,6 +4198,10 @@ export class Emitter {
         if (node.text === 'continue'
             || node.text === 'catch') {
             this.writer.writeString('_');
+        }
+
+        if (isConstructor) {
+            this.writer.writeString('/*constructor:*/');
         }
 
         this.writer.writeString(node.text);
