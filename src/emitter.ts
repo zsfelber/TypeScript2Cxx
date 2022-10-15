@@ -434,6 +434,10 @@ export class Emitter {
 
                 this.WriteHeader(true);
 
+                // NOTE Not implemented here:
+                // dependency analysis
+                // proper way is building a symbol level dependency graph
+                // (for my purposes)
                 this.processHeaderFileIncludes(sourceFile, true);
 
                 this.processHeaderFilePredecls(sourceFile);
