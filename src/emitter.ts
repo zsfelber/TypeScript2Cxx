@@ -4156,6 +4156,11 @@ export class Emitter {
                         return false;
                     }
                     return true;
+                case ts.SyntaxKind.ModuleDeclaration:
+                    if ((<ts.ModuleDeclaration>(node.parent)).name === node) {
+                        return false;
+                    }
+                    return true;
                 default:
                     return true;
             }
