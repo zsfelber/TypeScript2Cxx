@@ -4120,7 +4120,7 @@ export class Emitter {
         return null;
     }
 
-    private shouldBeConstructorReference(node: ts.Identifier, type: ts.TypeNode): boolean {
+    private shouldBeConstructorReference(node: ts.Identifier, typeInfo: ts.Type, type: ts.TypeNode): boolean {
             
         if (node.parent) {
             switch (node.parent.kind) {
@@ -4136,6 +4136,23 @@ export class Emitter {
                     return true;
                 case ts.SyntaxKind.NewExpression:
                     if ((<ts.NewExpression>(node.parent)).expression===node) {
+                        return false;
+                    }
+                    return true;
+                case ts.SyntaxKind.PropertyAccessExpression:
+                    if ((<ts.PropertyAccessExpression>(node.parent)).expression===node) {
+                        return false;
+                    }
+                    return true;
+                case ts.SyntaxKind.ElementAccessExpression:
+                    if ((<ts.ElementAccessExpression>(node.parent)).expression===node) {
+                        return false;
+                    }
+                    return true;
+                case ts.SyntaxKind.BinaryExpression:
+                    if ((<ts.BinaryExpression>(node.parent)).operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword
+                        &&
+                        (<ts.BinaryExpression>(node.parent)).right===node) {
                         return false;
                     }
                     return true;
@@ -4163,7 +4180,7 @@ export class Emitter {
                         break;
                     case ts.SyntaxKind.TypeQuery:
                         //this.writer.writeString('/*typequery:*/');
-                        result = this.shouldBeConstructorReference(node, type);
+                        result = this.shouldBeConstructorReference(node, typeInfo, type);
                         break;
                 }
             }
