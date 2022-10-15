@@ -4126,20 +4126,20 @@ export class Emitter {
             switch (node.parent.kind) {
                 case ts.SyntaxKind.ParenthesizedExpression:
                     if ((<ts.ParenthesizedExpression>(node.parent)).expression===node) {
-                        return true;
+                        return false;
                     }
-                    return false;
+                    return true;
                 case ts.SyntaxKind.TypeAssertionExpression:
                     if ((<ts.TypeAssertion>(node.parent)).type===type) {
-                        return true;
+                        return false;
                     }
-                    return false;
+                    return true;
                 default:
-                    return false;
+                    return true;
             }
         }
 
-        return true;
+        return false;
     }
 
     private resolveIsConstructorReference(node: ts.Identifier): boolean {
