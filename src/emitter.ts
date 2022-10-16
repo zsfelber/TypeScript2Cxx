@@ -2713,9 +2713,11 @@ export class Emitter {
         things.inferredReturnType = this.findReturnType(node, things);
         if (node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void") {
 
+            if (implementationMode) return true;
+ 
             this.writer.writeStringNewLine('// base constructor : ');
 
-            this.writer.writeStringNewLine('// ');
+            this.writer.writeString('// ');
         }
 
         if (things.isNestedFunction) {
@@ -2746,6 +2748,11 @@ export class Emitter {
             this.writer.writeStringNewLine(')');
         //}
 
+        if (node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void") {
+            this.writer.writeStringNewLine();
+            return true;
+        }
+
         let skipped = 0;
         if (node.kind === ts.SyntaxKind.Constructor && implementationMode) {
             skipped = this.processFunctionExpressionConstructor(node, things, implementationMode);
@@ -2755,12 +2762,6 @@ export class Emitter {
             // abstract
             this.writer.cancelNewLine();
             this.writer.writeString(' = 0');
-        }
-
-        if (node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void") {
-            this.writer.EndOfStatement();
-            this.writer.writeStringNewLine();
-            return true;
         }
 
         if (!noBody && (things.isArrowFunction || things.isFunctionExpression || implementationMode)) {
