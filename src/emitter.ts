@@ -1535,7 +1535,7 @@ export class Emitter {
         this.processClassForwardDeclarationInternal(node);
 
         let next = false;
-        let supercl0="object";
+        let supercl0;
         if (node.heritageClauses) {
             let baseClass;
             node.heritageClauses.forEach(heritageClause => {
@@ -1562,7 +1562,11 @@ export class Emitter {
                         let ow = this.writer;
                         try {
                             this.writer = new CodeWriter();
+
                             this.writer.writeString(identifier.text);
+
+                            this.processTemplateArguments(type, true);
+
                             supercl = this.writer.getText();
                             if (!supercl0) {
                                 supercl0 = supercl;
@@ -1571,8 +1575,6 @@ export class Emitter {
                             this.writer = ow;
                         }
                         this.writer.writeString(supercl);
-
-                        this.processTemplateArguments(type, true);
 
                         next = true;
                     } else {
@@ -1584,6 +1586,7 @@ export class Emitter {
         } else {
             this.writer.writeString(' : public object');
         }
+        if(!supercl0) supercl0="object";
 
         // Not required:
         // already done in core.h/tmpl::object and also "virtual ~object()" :
