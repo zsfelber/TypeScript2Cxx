@@ -2751,8 +2751,10 @@ export class Emitter {
             node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void";
 
         let obsoleteConstructor = 
-            this.wasCurClassConstructorInStack &&
-            uninferredConstructor;
+            node.kind === ts.SyntaxKind.Constructor && 
+            this.wasCurClassConstructorInStack //&&
+            //uninferredConstructor
+            ;
 
         if (obsoleteConstructor) {
 
@@ -2861,7 +2863,7 @@ export class Emitter {
         if (node.kind === ts.SyntaxKind.Constructor && !implementationMode) {    
             this.writer.EndOfStatement();
             this.writer.writeStringNewLine();
-            this.writer.writeStringNewLine("// T:"+things.inferredReturnType+" Args:"+things.functionArgs+">");
+            this.writer.writeStringNewLine("// T:"+things.inferredReturnType+" Args:"+things.functionArgs);
             this.writer.writeStringNewLine("typedef constructor_by_args<"+things.inferredReturnType+", "+things.functionArgs+"> constructor_type");
             this.writer.EndOfStatement();
             this.writer.writeStringNewLine("constexpr static constructor_type constructor_type_obj = constructor_type()");
