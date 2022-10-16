@@ -1762,11 +1762,12 @@ constexpr const T const_(T t) {
             return create(args...);
         }
 
-        virtual any invoke(std::initializer_list<any> args_) override;
+        // still pure virtual :
+        virtual invoke(std::initializer_list<any> args_) = 0;
     };
 
     template <typename F, typename T = typename std::result_of<F>::type, typename Tnc=typename std::remove_const<T>::type, typename Tncnp=typename std::remove_pointer<Tnc>::type>
-    struct constructor_func : function_t<F>, constructor<Tncnp>
+    struct constructor_ref : function_t<F>, class_ref<Tncnp>
     {
         static_assert(!std::is_same<Tnc, Tncnp>::value, "return type should be a pointer to object type");
 
@@ -1774,7 +1775,7 @@ constexpr const T const_(T t) {
     };
 
     template <typename T, typename... Args>
-    struct constructor_by_args : constructor_func<std::function<T*(Args...)>> {
+    struct constructor_by_args : constructor_ref<std::function<T*(Args...)>> {
 
 
         using function_t::function_t;
@@ -3581,13 +3582,6 @@ constexpr const T const_(T t) {
     any function_t<F>::invoke(std::initializer_list<any> args_)
     {
         auto result = invokeWithInitList(*_f, args_);
-        return result;
-    }
-
-    template <typename T>
-    any class_ref<T>::invoke(std::initializer_list<any> args_)
-    {
-        auto result = invokeWithInitList(*this, args_);
         return result;
     }
 

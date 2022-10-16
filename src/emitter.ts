@@ -2786,8 +2786,18 @@ export class Emitter {
                 this.writer.EndOfStatement();
             }
 
+            
+            if (node.kind === ts.SyntaxKind.Constructor && !implementationMode) {
+                things.constructorTemplAccess += ("// T:"+things.inferredReturnType+" Args:"+things.functionArgs+">\n");
+                things.constructorTemplAccess += ("typedef constructor_by_args<"+things.inferredReturnType+", "+things.functionArgs+"> constructor_type;");
+        
+                things.constructorTemplAccess;
+            }
+
+
             this.writer.EndBlock();
         }
+
     }
 
     private processFunctionExpressionLambda(
@@ -2872,6 +2882,7 @@ export class Emitter {
         node.parameters.forEach((element, index) => {
             if (next) {
                 this.writer.writeString(', ');
+                things.functionArgs += ', ';
             }
 
             if (element.name.kind !== ts.SyntaxKind.Identifier) {
@@ -2886,10 +2897,22 @@ export class Emitter {
                 || this.resolver.getOrResolveTypeOfAsTypeNode(element.initializer);
             if (element.dotDotDotToken) {
                 this.writer.writeString('Args...');
+                things.functionArgs += 'Args...';
             } else if (this.isTemplateType(effectiveType)) {
                 this.writer.writeString('P' + index);
+                things.functionArgs += 'P' + index;
             } else {
-                this.processType(effectiveType, things.isArrowFunction, false, false, false, true);
+                let ow = this.writer;
+                let arg = "";
+                try {
+                    this.writer = new CodeWriter();
+                    this.processType(effectiveType, things.isArrowFunction, false, false, false, true);
+                    arg = this.writer.getText();
+                } finally {
+                    this.writer = ow;
+                }
+                this.writer.writeString(arg);
+                things.functionArgs += arg;
             }
 
             this.writer.writeString(' ');
@@ -4402,7 +4425,8 @@ class FuncDefThings {
     inferredReturnType;
     noReturnStatement:boolean;
     noReturn:boolean;
-
+    functionArgs="";
+    constructorTemplAccess="";
 
     constructor(e:Emitter,
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
