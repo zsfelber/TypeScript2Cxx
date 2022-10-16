@@ -2529,7 +2529,7 @@ export class Emitter {
 
 
     private findReturnType(node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-        | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration) {
+        | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThing) {
 
         let inferredTp = node.type;
         let inferredTp0:ts.Type;
@@ -2538,7 +2538,7 @@ export class Emitter {
         const noReturnStatement = !r;
         const noReturn = !r || !r.hasValue();
         const isClassMemberDeclaration = this.isClassMemberDeclaration(node);
-        const isClassMember = isClassMemberDeclaration || this.isClassMemberSignature(node);
+        const isClassMember = things.isClassMemberDeclaration || this.isClassMemberSignature(node);
 
         /*if (!inferredTp && r && r.hasValue()) {
             inferredTp = 
@@ -2647,9 +2647,9 @@ export class Emitter {
                 let r0 = tsTypeToC(inferredTp0);
                 if (r0) {
                     return r0;
-                } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
+                } else if (things.isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
                     return ('string');
-                } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
+                } else if (things.isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
                     return ('std::size_t');
                 } else {
                     let ow = this.writer;
@@ -2666,9 +2666,9 @@ export class Emitter {
             if (noReturn) {
                 return 'void';
             } else {
-                if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
+                if (things.isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
                     return ('string');
-                } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
+                } else if (things.isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
                     return ('std::size_t');
                 } else {
                     return ('any');
@@ -2717,20 +2717,11 @@ export class Emitter {
         // const noCapture = !this.requireCapture(node);
 
         // in case of nested function
-        const isNestedFunction = node.parent && node.parent.kind === ts.SyntaxKind.Block;
-        if (isNestedFunction) {
+        let things = new FuncDefThing(this, node);
+
+        if (things.isNestedFunction) {
             implementationMode = true;
         }
-
-        const isClassMemberDeclaration = this.isClassMemberDeclaration(node);
-        const isClassMember = isClassMemberDeclaration || this.isClassMemberSignature(node);
-        const isFunctionOrMethodDeclaration =
-            (node.kind === ts.SyntaxKind.FunctionDeclaration || isClassMember)
-            && !isNestedFunction;
-        const isFunctionExpression = node.kind === ts.SyntaxKind.FunctionExpression;
-        const isFunction = isFunctionOrMethodDeclaration || isFunctionExpression;
-        const isArrowFunction = node.kind === ts.SyntaxKind.ArrowFunction || isNestedFunction;
-        const writeAsLambdaCFunction = isArrowFunction || isFunction;
 
         if (implementationMode && node.parent && node.parent.kind === ts.SyntaxKind.ClassDeclaration && this.isTemplate(<any>node.parent)) {
             this.processTemplateParams(<any>node.parent);
@@ -2742,24 +2733,25 @@ export class Emitter {
             this.processModifiers(node.modifiers);
         }
 
-        let inferredReturnType = this.findReturnType(node);
+        things.inferredReturnType = this.findReturnType(node, things);
 
-        if (writeAsLambdaCFunction) {
-            this.processFunctionExpressionLambda(node, implementationMode);
+        if (things.writeAsLambdaCFunction) {
+            this.processFunctionExpressionLambda(node, things, implementationMode);
         }
 
         this.writer.writeString('(');
 
-        this.processFunctionExpressionParameters(node, implementationMode);
+        this.processFunctionExpressionParameters(node, things, implementationMode);
 
-        /*if (isArrowFunction || isFunctionExpression) {
+        /*if (things.isArrowFunction || things.isFunctionExpression) {
             this.writer.writeStringNewLine(') mutable');
         } else {*/
             this.writer.writeStringNewLine(')');
         //}
 
+        let skipped = 0;
         if (node.kind === ts.SyntaxKind.Constructor && implementationMode) {
-            this.processFunctionExpressionConstructor(node, implementationMode);
+            skipped = this.processFunctionExpressionConstructor(node, things, implementationMode);
         }
 
         if (!implementationMode && isAbstract) {
@@ -2768,7 +2760,7 @@ export class Emitter {
             this.writer.writeString(' = 0');
         }
 
-        if (!noBody && (isArrowFunction || isFunctionExpression || implementationMode)) {
+        if (!noBody && (things.isArrowFunction || things.isFunctionExpression || implementationMode)) {
             this.writer.BeginBlock();
 
             node.parameters
@@ -2796,9 +2788,9 @@ export class Emitter {
             });
 
             // add default return if no body
-            if (node.kind !== ts.SyntaxKind.Constructor && noReturnStatement && inferredReturnType != 'void') {
+            if (node.kind !== ts.SyntaxKind.Constructor && noReturnStatement && things.inferredReturnType != 'void') {
                 this.writer.writeString('return ');
-                this.writer.writeString(inferredReturnType);
+                this.writer.writeString(things.inferredReturnType);
                 this.writer.writeString('()');
                 this.writer.EndOfStatement();
             }
@@ -2809,13 +2801,13 @@ export class Emitter {
 
     private processFunctionExpressionLambda(
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThing,
         implementationMode?: boolean) {
 
-        if (isFunctionOrMethodDeclaration) {
+        if (things.isFunctionOrMethodDeclaration) {
             // type declaration
             if (node.kind !== ts.SyntaxKind.Constructor) {
-                const isVirtual = isClassMember
+                const isVirtual = things.isClassMember
                     && !this.isStatic(node)
                     && !this.isTemplate(<ts.MethodDeclaration>node)
                     && implementationMode !== true;
@@ -2823,12 +2815,12 @@ export class Emitter {
                     this.writer.writeString('virtual ');
                 }
 
-                this.writer.writeString(inferredReturnType);
+                this.writer.writeString(things.inferredReturnType);
 
                 this.writer.writeString(' ');
             }
 
-            if (isClassMemberDeclaration && implementationMode) {
+            if (things.isClassMemberDeclaration && implementationMode) {
                 // in case of constructor
                 this.writeClassName();
 
@@ -2859,9 +2851,9 @@ export class Emitter {
                 // in case of constructor
                 this.writeClassName();
             }
-        } else if (isArrowFunction || isFunctionExpression) {
+        } else if (things.isArrowFunction || things.isFunctionExpression) {
 
-            if (isNestedFunction) {
+            if (things.isNestedFunction) {
                 this.writer.writeString('auto ');
                 if (node.name.kind === ts.SyntaxKind.Identifier) {
                     this.processExpression(node.name);
@@ -2881,8 +2873,8 @@ export class Emitter {
 
     private processFunctionExpressionParameters(
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
-        implementationMode?: boolean): boolean {
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThing,
+        implementationMode?: boolean) {
 
         let defaultParams = false;
         let next = false;
@@ -2906,7 +2898,7 @@ export class Emitter {
             } else if (this.isTemplateType(effectiveType)) {
                 this.writer.writeString('P' + index);
             } else {
-                this.processType(effectiveType, isArrowFunction, false, false, false, true);
+                this.processType(effectiveType, things.isArrowFunction, false, false, false, true);
             }
 
             this.writer.writeString(' ');
@@ -2944,8 +2936,8 @@ export class Emitter {
 
     private processFunctionExpressionConstructor(
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
-        implementationMode?: boolean) {
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThing,
+        implementationMode?: boolean): number {
 
         // constructor init
         let skipped = 0;
@@ -2997,6 +2989,7 @@ export class Emitter {
         }
 
         this.writer.writeString(' ');
+        return skipped;
     }
 
     private writeClassName() {
@@ -3124,7 +3117,7 @@ export class Emitter {
         this.processFunctionExpression(<any>node);
     }
 
-    private isClassMemberDeclaration(node: ts.Node) {
+    isClassMemberDeclaration(node: ts.Node) {
         if (!node) {
             return false;
         }
@@ -3136,7 +3129,7 @@ export class Emitter {
             || node.kind === ts.SyntaxKind.SetAccessor;
     }
 
-    private isClassMemberSignature(node: ts.Node) {
+    isClassMemberSignature(node: ts.Node) {
         if (!node) {
             return false;
         }
@@ -4404,3 +4397,31 @@ export class Emitter {
     }
 }
 
+
+
+
+class FuncDefThing {
+    isClassMemberDeclaration:boolean;
+    isClassMember:boolean;
+    isFunctionOrMethodDeclaration:boolean;
+    isFunctionExpression:boolean;
+    isFunction:boolean;
+    isArrowFunction:boolean;
+    writeAsLambdaCFunction:boolean;
+    isNestedFunction:boolean;
+    inferredReturnType
+
+    constructor(e:Emitter,node) {
+        this.isNestedFunction = node.parent && node.parent.kind === ts.SyntaxKind.Block;
+        this.isClassMemberDeclaration = e.isClassMemberDeclaration(node);
+        this.isClassMember = this.isClassMemberDeclaration || e.isClassMemberSignature(node);
+        this.isFunctionOrMethodDeclaration =
+            (node.kind === ts.SyntaxKind.FunctionDeclaration || this.isClassMember)
+            && !this.isNestedFunction;
+        this.isFunctionExpression = node.kind === ts.SyntaxKind.FunctionExpression;
+        this.isFunction = this.isFunctionOrMethodDeclaration || this.isFunctionExpression;
+        this.isArrowFunction = node.kind === ts.SyntaxKind.ArrowFunction || this.isNestedFunction;
+        this.writeAsLambdaCFunction = this.isArrowFunction || this.isFunction;
+    }
+
+}
