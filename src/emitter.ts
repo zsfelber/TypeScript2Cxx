@@ -472,6 +472,8 @@ export class Emitter {
                         // already done 2)
                         //this.writer.writeStringNewLine("// 3) forward decl "+(cnt++)+":");
                         //this.processForwardDeclaration(s);
+                    } else if (s.kind === ts.SyntaxKind.FunctionDeclaration) {
+                        // also done 2)
                     } else {
                         //this.writer.writeStringNewLine("// 3) statement "+(cnt++)+":");
                         this.processStatement(s);
@@ -562,7 +564,12 @@ export class Emitter {
         });
 
         let cnt=0;
-        sourceFile.statements.filter(s => this.isImportStatement(s)||this.isDeclarationStatement(s)).forEach(s => {
+        //sourceFile.statements.filter(s => this.isImportStatement(s)||this.isDeclarationStatement(s)).forEach(s => {
+        sourceFile.statements
+            .map(v => this.preprocessor.preprocessStatement(v))
+            .filter(s => this.isImportStatement(s)||this.isDeclarationStatement(s))
+            .forEach(s => {
+
             let ow = this.writer;
             try {
                 this.writer = new CodeWriter();
@@ -591,20 +598,31 @@ export class Emitter {
         });*/
 
         let cnt=0;
-        sourceFile.statements.filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s)).forEach(s => {
+        //sourceFile.statements.filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s)).forEach(s => {
+        sourceFile.statements
+            .map(v => this.preprocessor.preprocessStatement(v))
+            .filter(s => this.isDeclarationStatement(s) || this.isVariableStatement(s))
+            .forEach(s => {
+    
             let ow = this.writer;
             try {
                 this.writer = new CodeWriter();
                 this.processForwardDeclaration2(s);
+                if (s.kind === ts.SyntaxKind.FunctionDeclaration) {
+                    //this.writer.writeStringNewLine("// 2) function statement forward decl "+(cnt++)+":");
+                    this.processStatement(s);
+                }
                 if (this.writer.getText()) {
                     //ow.writeStringNewLine("// 2) forward decl "+(cnt++)+":");
                     ow.writeString(this.writer.getText());
                 }
+
             } finally {
                 this.writer = ow;
             }
 
         });
+
 
         /*if (this.writer.hasAnyContent(position)) {
             this.writer.writeStringNewLine();
@@ -2138,6 +2156,13 @@ export class Emitter {
 
         let next;
         switch (type && type.kind) {
+            case ts.SyntaxKind.ParenthesizedType:
+                const parenthesizedType = <ts.ParenthesizedTypeNode>type;
+                this.writer.writeString('(');
+                this.processType(parenthesizedType.type, auto, skipPointerInType, 
+                    noTypeName, implementingUnionType, isParam);
+                this.writer.writeString(')');
+                break;
             case ts.SyntaxKind.TrueKeyword:
             case ts.SyntaxKind.FalseKeyword:
             case ts.SyntaxKind.BooleanKeyword:
