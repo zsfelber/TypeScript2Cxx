@@ -2772,7 +2772,7 @@ export class Emitter {
                 try {
                     this.writer = new CodeWriter();
                     this.writeClassName();
-                    things.inferredReturnType = this.writer.getText();
+                    things.inferredReturnType = "$S<"+this.writer.getText()+">";
                 } finally {
                     this.writer = ow;
                 }
