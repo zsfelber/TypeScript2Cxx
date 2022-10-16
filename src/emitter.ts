@@ -2710,6 +2710,14 @@ export class Emitter {
         // in case of nested function
         let things = new FuncDefThings(this, node);
 
+        things.inferredReturnType = this.findReturnType(node, things);
+        if (node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void") {
+
+            this.writer.writeStringNewLine('// base constructor : ');
+
+            this.writer.writeStringNewLine('// ');
+        }
+
         if (things.isNestedFunction) {
             implementationMode = true;
         }
@@ -2723,8 +2731,6 @@ export class Emitter {
         if (implementationMode !== true) {
             this.processModifiers(node.modifiers);
         }
-
-        things.inferredReturnType = this.findReturnType(node, things);
 
         if (things.writeAsLambdaCFunction) {
             this.processFunctionExpressionLambda(node, things, implementationMode);
@@ -2749,6 +2755,12 @@ export class Emitter {
             // abstract
             this.writer.cancelNewLine();
             this.writer.writeString(' = 0');
+        }
+
+        if (node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void") {
+            this.writer.EndOfStatement();
+            this.writer.writeStringNewLine();
+            return true;
         }
 
         if (!noBody && (things.isArrowFunction || things.isFunctionExpression || implementationMode)) {
@@ -2794,6 +2806,8 @@ export class Emitter {
             this.writer.writeStringNewLine();
             this.writer.writeStringNewLine("// T:"+things.inferredReturnType+" Args:"+things.functionArgs+">");
             this.writer.writeStringNewLine("typedef constructor_by_args<"+things.inferredReturnType+", "+things.functionArgs+"> constructor_type");
+            this.writer.EndOfStatement();
+            this.writer.writeStringNewLine("constexpr static constructor_type constructor = constructor_type()");
             this.writer.EndOfStatement();
             this.writer.writeStringNewLine();
         }
@@ -4427,7 +4441,6 @@ class FuncDefThings {
     noReturnStatement:boolean;
     noReturn:boolean;
     functionArgs="";
-    constructorTemplAccess="";
 
     constructor(e:Emitter,
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
