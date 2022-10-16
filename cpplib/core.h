@@ -1720,6 +1720,17 @@ constexpr const T const_(T t) {
     {
     };
 
+    template<typename P> 
+    struct deref_shared_ptr {
+        typedef P shared_p;
+    };
+
+    template<typename T> 
+    struct deref_shared_ptr<std::shared_ptr<T>> {
+        typedef T item_t;
+    };
+
+
     struct function
     {
         virtual any invoke(std::initializer_list<any> args_) = 0;
@@ -1752,14 +1763,14 @@ constexpr const T const_(T t) {
         virtual any invoke(std::initializer_list<any> args_) override;
     };
 
-    template <typename T>
+    template <typename P, typename T=typename deref_shared_ptr<P>::item_t>
     struct class_ref : function {
 
-        static_assert(std::is_base_of<object, T>::value, "return type should be derived from object");
+        static_assert(std::is_base_of<object, T>::value, "return type should be derived from shared_ptr to object");
 
         template<typename... Args>
-        inline static T* create(Args... &args) {
-            T* result = new T(args...);
+        inline static P create(Args... &args) {
+            P result = std::make_shared<T>(args...);
             return result;
         }
 
@@ -1772,16 +1783,15 @@ constexpr const T const_(T t) {
         virtual invoke(std::initializer_list<any> args_) = 0;
     };
 
-    template <typename F, typename T = typename std::result_of<F>::type, typename Tnc=typename std::remove_const<T>::type, typename Tncnp=typename std::remove_pointer<Tnc>::type>
-    struct constructor_ref : function_t<F>, class_ref<Tncnp>
+    template <typename F, typename T = typename std::result_of<F>::type>
+    struct constructor_ref : function_t<F>, class_ref<T>
     {
-        static_assert(!std::is_same<Tnc, Tncnp>::value, "return type should be a pointer to object type");
 
         using function_t::function_t;
     };
 
     template <typename T, typename... Args>
-    struct constructor_by_args : constructor_ref<std::function<T*(Args...)>> {
+    struct constructor_by_args : constructor_ref<std::function<T(Args...)>> {
 
 
         using function_t::function_t;

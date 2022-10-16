@@ -1535,6 +1535,7 @@ export class Emitter {
         this.processClassForwardDeclarationInternal(node);
 
         let next = false;
+        let supercl0="object";
         if (node.heritageClauses) {
             let baseClass;
             node.heritageClauses.forEach(heritageClause => {
@@ -1557,7 +1558,20 @@ export class Emitter {
                         }
 
                         this.writer.writeString('public ');
-                        this.writer.writeString(identifier.text);
+                        let supercl="";
+                        let ow = this.writer;
+                        try {
+                            this.writer = new CodeWriter();
+                            this.writer.writeString(identifier.text);
+                            supercl = this.writer.getText();
+                            if (!supercl0) {
+                                supercl0 = supercl;
+                            }
+                        } finally {
+                            this.writer = ow;
+                        }
+                        this.writer.writeString(supercl);
+
                         this.processTemplateArguments(type, true);
 
                         next = true;
@@ -1583,6 +1597,8 @@ export class Emitter {
         this.writer.DecreaseIntent();
         this.writer.writeString('public:');
         this.writer.IncreaseIntent();
+        this.writer.writeStringNewLine();
+        this.writer.writeStringNewLine("typedef "+supercl0+" _Super_;");
         this.writer.writeStringNewLine();
 
         //this.writer.writeString('using std::enable_shared_from_this<');
@@ -4099,7 +4115,7 @@ export class Emitter {
         const typeOfExpression = isNew && this.resolver.getOrResolveTypeOf(node.expression);
         const isArray = isNew && typeOfExpression && typeOfExpression.symbol && typeOfExpression.symbol.name === 'ArrayConstructor';
 
-        this.isConstructorInStack = false;
+        this.isInvokableClassRefInStack = false;
 
         if (isArray) {
             this.writer.writeString('std::make_shared<');
@@ -4118,7 +4134,7 @@ export class Emitter {
                 this.writer = ow;
                 this.isNewExpressionInStack = false;
             }
-            if (isNew && !this.isConstructorInStack) {
+            if (isNew && !this.isInvokableClassRefInStack) {
                 this.writer.writeString('std::make_shared<');
             }
             
@@ -4128,7 +4144,7 @@ export class Emitter {
             this.processTemplateArguments(node);
         }
 
-        if (isArray || (isNew && !this.isConstructorInStack)) {
+        if (isArray || (isNew && !this.isInvokableClassRefInStack)) {
             // closing template
             this.writer.writeString('>');
         }
@@ -4192,7 +4208,7 @@ export class Emitter {
             }
         }
 
-        this.writer.writeString('__super');
+        this.writer.writeString('_Super_');
     }
 
     private processVoidExpression(node: ts.VoidExpression): void {
@@ -4255,7 +4271,7 @@ export class Emitter {
         return null;
     }
 
-    private shouldBeConstructorReference(node: ts.Identifier, typeInfo: ts.Type, type: ts.TypeNode): boolean {
+    private shouldBeInvokableClassRef(node: ts.Identifier, typeInfo: ts.Type, type: ts.TypeNode): boolean {
             
         if (node.parent) {
             switch (node.parent.kind) {
@@ -4304,7 +4320,7 @@ export class Emitter {
         return false;
     }
 
-    private resolveIsConstructorReference(node: ts.Identifier): boolean {
+    private resolveIsInvokableClassRef(node: ts.Identifier): boolean {
  
         let result = false;
  
@@ -4324,7 +4340,7 @@ export class Emitter {
                         break;
                     case ts.SyntaxKind.TypeQuery:
                         //this.writer.writeString('/*typequery:*/');
-                        result = this.shouldBeConstructorReference(node, typeInfo, type);
+                        result = this.shouldBeInvokableClassRef(node, typeInfo, type);
                         break;
                 }
             }
@@ -4336,7 +4352,7 @@ export class Emitter {
     }
 
     isNewExpressionInStack: boolean = false;
-    isConstructorInStack: boolean = false;
+    isInvokableClassRefInStack: boolean = false;
 
     private processIdentifier(node: ts.Identifier): void {
 
@@ -4344,7 +4360,7 @@ export class Emitter {
             || node.parent.kind === ts.SyntaxKind.PropertyAccessExpression
                 && (<ts.PropertyAccessExpression>(node.parent)).name === node;
 
-        let isConstructor = false;
+        let isInvokableClassRef = false;
 
         if (!isRightPartOfPropertyAccess) {
 
@@ -4359,7 +4375,7 @@ export class Emitter {
             }
 
             if (!nstype) {
-                this.isConstructorInStack = isConstructor = this.resolveIsConstructorReference(node);
+                this.isInvokableClassRefInStack = isInvokableClassRef = this.resolveIsInvokableClassRef(node);
             }
         }
 
@@ -4371,7 +4387,7 @@ export class Emitter {
 
         this.writer.writeString(node.text);
 
-        if (isConstructor && !this.isNewExpressionInStack) {
+        if (isInvokableClassRef && !this.isNewExpressionInStack) {
             this.writer.writeString('::constructor_type_obj');
         }
     }
