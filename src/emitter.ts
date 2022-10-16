@@ -2764,7 +2764,8 @@ export class Emitter {
 
             this.writer.writeString('// ');
         } else {
-            this.wasCurClassConstructorInStack = true;
+            if (node.kind === ts.SyntaxKind.Constructor)
+                this.wasCurClassConstructorInStack = true;
 
             if (uninferredConstructor) {
                 let ow = this.writer;
