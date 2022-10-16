@@ -67,6 +67,7 @@ namespace js
 
         template <typename K, typename V>
         struct object;
+
     }
 
     typedef tmpl::pointer_t<void *> pointer_t;
@@ -125,6 +126,10 @@ namespace js
     {
         T::exists;
     };
+
+    template <typename T>
+    concept is_object = std::is_base_of<object, T>;
+
 
     template <class _Ty>
     struct is_stringish : std::bool_constant<std::is_same_v<_Ty, const char_t *> || std::is_same_v<_Ty, std::string> || std::is_same_v<_Ty, std::wstring> || std::is_same_v<_Ty, std::string_view> || std::is_same_v<_Ty, std::wstring_view> || std::is_same_v<_Ty, string> || std::is_same_v<_Ty, any>>
@@ -514,7 +519,7 @@ constexpr const T const_(T t) {
                 return p.isUndefined || true;
             }
 
-            template <typename _Ty>
+            /*template <typename _Ty>
             bool operator==(std::shared_ptr<_Ty> sp)
             {
                 return false;
@@ -524,7 +529,7 @@ constexpr const T const_(T t) {
             bool operator!=(std::shared_ptr<_Ty> sp)
             {
                 return false;
-            }
+            }*/
 
             friend std::ostream &operator<<(std::ostream &os, pointer_t val)
             {
@@ -1618,32 +1623,32 @@ constexpr const T const_(T t) {
     }
 
     // function ///////////////////////////////////////////////////////////////////////
-    template <typename Rx, typename _Cls, typename... Args>
-    struct _Deduction_MethodPtr<Rx (/*__thiscall*/ _Cls::*)(Args...) const>
-    {
-        using _ReturnType = Rx;
-        const static size_t _CountArgs = sizeof...(Args);
-    };
+    // template <typename Rx, typename _Cls, typename... Args>
+    // struct _Deduction_MethodPtr<Rx (/*__thiscall*/ _Cls::*)(Args...) const>
+    // {
+    //     using _ReturnType = Rx;
+    //     const static size_t _CountArgs = sizeof...(Args);
+    // };
 
-    template <typename Rx, typename _Cls, typename... Args>
-    struct _Deduction_MethodPtr<Rx (/*__thiscall*/ _Cls::*)(Args...)>
-    {
-        using _ReturnType = Rx;
-        const static size_t _CountArgs = sizeof...(Args);
-    };
+    // template <typename Rx, typename _Cls, typename... Args>
+    // struct _Deduction_MethodPtr<Rx (/*__thiscall*/ _Cls::*)(Args...)>
+    // {
+    //     using _ReturnType = Rx;
+    //     const static size_t _CountArgs = sizeof...(Args);
+    // };
 
-    template <typename Rx, typename... Args>
-    struct _Deduction_MethodPtr<Rx(/*__cdecl*/ *)(Args...)>
-    {
-        using _ReturnType = Rx;
-        const static size_t _CountArgs = sizeof...(Args);
-    };
+    // template <typename Rx, typename... Args>
+    // struct _Deduction_MethodPtr<Rx(/*__cdecl*/ *)(Args...)>
+    // {
+    //     using _ReturnType = Rx;
+    //     const static size_t _CountArgs = sizeof...(Args);
+    // };
 
-    template <typename F, typename _type = decltype(&F::operator())>
-    struct _Deduction
-    {
-        using type = _type;
-    };
+    // template <typename F, typename _type = decltype(&F::operator())>
+    // struct _Deduction
+    // {
+    //     using type = _type;
+    // };
 
     template <typename F, typename Array, std::size_t... I>
     auto invoke_seq_impl(const F &f, Array &a, std::index_sequence<I...>)
@@ -1669,19 +1674,35 @@ constexpr const T const_(T t) {
         return invoke_seq_impl(f, a, Indices{});
     }
 
+    template<typename T> 
+    struct function_traits;
+
+    template<typename R, typename ...Args> 
+    struct function_traits<std::function<R(Args...)>>
+    {
+        static const size_t nargs = sizeof...(Args);
+
+        typedef R result_type;
+
+        template <size_t i>
+        struct arg
+        {
+            typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+        };
+
+
+    };
+
     struct function
     {
         virtual any invoke(std::initializer_list<any> args_) = 0;
 
-        template <typename... Args>
-        auto operator()(Args... args);
     };
 
-    template <typename F, typename _MethodType = typename _Deduction<F>::type>
+    template <typename F>
     struct function_t : function
     {
-        using _MethodPtr = _Deduction_MethodPtr<_MethodType>;
-        using _ReturnType = typename _MethodPtr::_ReturnType;
+        typedef function_traits<F> traits;
 
         F _f;
 
@@ -1689,8 +1710,52 @@ constexpr const T const_(T t) {
         {
         }
 
+        template <typename... Args>
+        auto operator()(Args... args);
+
         virtual any invoke(std::initializer_list<any> args_) override;
     };
+
+    template <typename T>
+    struct constructor_ref {
+
+        static_assert(std::is_base_of<object, T>::value, "return type should be derived from object");
+
+        template<typename... Args>
+        inline static T* create(Args... &args) {
+            T* result = new T(args...);
+            return result;
+        }
+
+    };
+
+    template <typename T>
+    struct constructor : function, constructor_ref<T> {
+
+        template <typename... Args>
+        auto operator()(Args... args) {
+            return create(args...);
+        }
+
+        virtual any invoke(std::initializer_list<any> args_) override;
+    };
+
+    template <typename F, typename T = typename std::result_of<F>::type, typename Tnc=typename std::remove_const<T>::type, typename Tncnp=typename std::remove_pointer<Tnc>::type>
+    struct constructor_t : function_t<F>, constructor<Tncnp>
+    {
+        static_assert(!std::is_same<Tnc, Tncnp>::value, "return type should be a pointer to object type");
+
+        using function_t::function_t;
+    };
+
+    template <typename T, typename... Args>
+    struct constructor_by_args : constructor_t<std::function<T*(Args...)>> {
+
+
+        using function_t::function_t;
+
+    };
+
 
     template <typename T>
     struct ArrayKeys
@@ -2209,6 +2274,8 @@ constexpr const T const_(T t) {
 
     typedef tmpl::object<string, any> object;
 
+
+
     struct any
     {
         struct any_hash
@@ -2240,7 +2307,6 @@ constexpr const T const_(T t) {
             array_type,
             object_type,
             function_type,
-            class_type
         };
 
         using any_value_type = std::variant<
@@ -2249,9 +2315,9 @@ constexpr const T const_(T t) {
             js::pointer_t,
             js::number,
             js::string,
-            std::shared_ptr<js::function>,
+            std::shared_ptr<js::array_any>,
             std::shared_ptr<js::object>,
-            std::shared_ptr<js::array_any>
+            std::shared_ptr<js::function>
             >;
 
         any_value_type _value;
@@ -2511,10 +2577,6 @@ constexpr const T const_(T t) {
                 return pointer_t(number_ref());
             }
 
-            if (get_type() == anyTypeId::class_type)
-            {
-                return pointer_t(class_ref().get());
-            }
 
             return pointer_t(0xffffffff);
         }
@@ -2620,8 +2682,6 @@ constexpr const T const_(T t) {
                 return array_ref()->size() > 0;
             case anyTypeId::pointer_type:
                 return get<pointer_t>();
-            case anyTypeId::class_type:
-                return true;
             default:
                 break;
             }
@@ -2653,7 +2713,7 @@ constexpr const T const_(T t) {
             throw "wrong type";
         }
 
-        template <typename T>
+        /*template <typename T>
         operator std::shared_ptr<T>()
         {
             if (get_type() == anyTypeId::class_type)
@@ -2662,7 +2722,7 @@ constexpr const T const_(T t) {
             }
 
             throw "wrong type";
-        }
+        }*/
 
         template <typename Rx, typename... Args>
         operator std::function<Rx(Args...)>()
@@ -2734,7 +2794,7 @@ constexpr const T const_(T t) {
             case anyTypeId::string_type:
                 return string_ref().is_null() && other._ptr == nullptr;
             case anyTypeId::object_type:
-            case anyTypeId::class_type:
+            //case anyTypeId::class_type:
             case anyTypeId::pointer_type:
                 return get<pointer_t>()._ptr == other._ptr;
             }
@@ -3449,8 +3509,8 @@ constexpr const T const_(T t) {
             case anyTypeId::object_type:
                 return os << TXT("[object]");
 
-            case anyTypeId::class_type:
-                return os << val.class_ref().get()->toString();
+            //case anyTypeId::class_type:
+            //    return os << val.class_ref().get()->toString();
 
             default:
                 return os << TXT("[any]");
@@ -3458,26 +3518,51 @@ constexpr const T const_(T t) {
         }
     };
 
-    
-    template <typename... Args>
-    auto function::operator()(Args... args)
-    {
-        return invoke({args...});
-    }
 
-    template <typename F, typename _MethodType>
-    any function_t<F, _MethodType>::invoke(std::initializer_list<any> args_)
+    template <typename F>
+    any invokeWithInitList(F &_f, std::initializer_list<any> args_)
     {
+        typedef function_traits<F> traits;
+
         auto args_vector = std::vector<any>(args_);
-        if constexpr (std::is_void_v<_ReturnType>)
+        if constexpr (std::is_void_v<traits::return_type>)
         {
-            invoke_seq<_MethodPtr::_CountArgs>(_f, args_vector);
+            invoke_seq<traits::nargs>(_f, args_vector);
             return any();
         }
         else
         {
-            return invoke_seq<_MethodPtr::_CountArgs>(_f, args_vector);
+            return invoke_seq<traits::nargs>(_f, args_vector);
         }
+    }
+
+    template <typename F>
+    template <typename... Args>
+    auto function_t<F>::operator()(Args... args)
+    {
+
+        if constexpr (std::is_void_v<traits::return_type>)
+        {
+            _f(args...);
+        }
+        else 
+        {
+            return _f(args...);
+        }
+    }
+
+    template <typename F>
+    any function_t<F>::invoke(std::initializer_list<any> args_)
+    {
+        auto result = invokeWithInitList(*_f, args_);
+        return result;
+    }
+
+    template <typename T>
+    any constructor_t<T>::invoke(std::initializer_list<any> args_)
+    {
+        auto result = invokeWithInitList(*this, args_);
+        return result;
     }
 
     template <typename T>

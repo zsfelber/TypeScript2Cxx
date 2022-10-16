@@ -2328,7 +2328,17 @@ export class Emitter {
 
                 break;
             case ts.SyntaxKind.ConstructorType:
-                this.writer.writeString('/*constructor:*/');
+                const cfunctionType = <ts.FunctionTypeNode>type;
+                this.writer.writeString('constructor_by_args<');
+                this.processType(cfunctionType.type);
+                if (cfunctionType.parameters) {
+                    cfunctionType.parameters.forEach(element => {
+                        this.writer.writeString(', ');
+                        this.processType(element);
+                    });
+                }
+                this.writer.writeString('>');
+                break;
             case ts.SyntaxKind.FunctionType:
 
                 const functionType = <ts.FunctionTypeNode>type;
@@ -4009,7 +4019,7 @@ export class Emitter {
         const typeOfExpression = isNew && this.resolver.getOrResolveTypeOf(node.expression);
         const isArray = isNew && typeOfExpression && typeOfExpression.symbol && typeOfExpression.symbol.name === 'ArrayConstructor';
 
-        if (node.kind === ts.SyntaxKind.NewExpression && !isArray) {
+        if (node.kind === ts.SyntaxKind.NewExpression/* && !isArray*/) {
             this.writer.writeString('std::make_shared<');
         }
 
@@ -4017,11 +4027,22 @@ export class Emitter {
             this.writer.writeString('array');
         } else {
 
-            this.processExpression(node.expression);
+            let name:string;
+            let ow = this.writer;
+            try {
+                this.writer = new CodeWriter();
+                this.processExpression(node.expression);
+                name = this.writer.getText();
+            } finally {
+                this.writer = ow;
+            }
+            this.writer.writeString(name);
+
+
             this.processTemplateArguments(node);
         }
 
-        if (node.kind === ts.SyntaxKind.NewExpression && !isArray) {
+        if (node.kind === ts.SyntaxKind.NewExpression/*&& !isArray*/) {
             // closing template
             this.writer.writeString('>');
         }
@@ -4256,10 +4277,14 @@ export class Emitter {
         }
 
         if (isConstructor) {
-            this.writer.writeString('/*constructor:*/');
+            this.writer.writeString('constructor_ref<');
         }
 
         this.writer.writeString(node.text);
+
+        if (isConstructor) {
+            this.writer.writeString('>()');
+        }
     }
 
     private processPropertyAccessExpression(node: ts.PropertyAccessExpression): void {
