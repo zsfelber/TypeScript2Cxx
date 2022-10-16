@@ -1724,6 +1724,12 @@ constexpr const T const_(T t) {
     {
         virtual any invoke(std::initializer_list<any> args_) = 0;
 
+        inline bool operator==(const function& other) {
+            void *mem = this;
+            void *omem = &other;
+            return mem==omem;
+        }
+
     };
 
     template <typename F>
@@ -2189,6 +2195,12 @@ constexpr const T const_(T t) {
 
             /*!*/virtual/*!*/ ~object()
             {
+            }
+
+            typedef constructor_by_args<$S<object>> constructor_type;
+            constexpr static constructor_type constructor_type_obj = constructor_type();
+            virtual function& constructor() {
+                return constructor_type_obj;
             }
 
             constexpr operator bool()

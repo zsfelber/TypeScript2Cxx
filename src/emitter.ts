@@ -23,6 +23,14 @@ interface EmitFiles {
     fileNameCpp:string;
 }
 
+type HasTemplate0 = ts.MethodDeclaration | ts.ConstructorDeclaration | ts.FunctionDeclaration;
+type HasTemplate1 = HasTemplate0 | ts.ClassDeclaration | ts.FunctionExpression;
+type HasTemplate = HasTemplate0 | ts.FunctionExpression | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration | 
+    ts.TypeAliasDeclaration | ts.ArrowFunction | ts.MethodSignature;
+
+type FuncExpr = ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration;
+
 export class Emitter {
     public writer: CodeWriter;
     public writer_predecl: CodeWriter;
@@ -829,9 +837,7 @@ export class Emitter {
         }
     }
 
-    public isTemplate(declaration:
-        ts.MethodDeclaration | ts.ConstructorDeclaration | ts.ClassDeclaration
-        | ts.FunctionDeclaration | ts.FunctionExpression) {
+    public isTemplate(declaration: HasTemplate) {
         if (!declaration) {
             return false;
         }
@@ -872,7 +878,7 @@ export class Emitter {
             }
         }
 
-        if (effectiveType.kind === ts.SyntaxKind.FunctionType
+        /*if (effectiveType.kind === ts.SyntaxKind.FunctionType
             && this.resolver.isTypeParameter(effectiveType.type)) {
             return true;
         }
@@ -880,14 +886,14 @@ export class Emitter {
         if (effectiveType.kind === ts.SyntaxKind.ConstructorType
             && this.resolver.isTypeParameter(effectiveType.type)) {
             return true;
-        }
+        }*/
 
         if (this.resolver.isTypeAliasUnionType(effectiveType.typeName)) {
             return true;
         }
     }
 
-    private isMethodParamsTemplate(declaration: ts.MethodDeclaration | any): boolean {
+    private isMethodParamsTemplate(declaration: HasTemplate): boolean {
         if (!declaration) {
             return false;
         }
@@ -902,9 +908,11 @@ export class Emitter {
             return true;
         }
 
-        for (const element of declaration.parameters) {
-            if (element.dotDotDotToken || this.isTemplateType(element.type)) {
-                return true;
+        if (declaration["parameters"]) {
+            for (const element of (declaration as FuncExpr).parameters) {
+                if (element.dotDotDotToken || this.isTemplateType(element.type)) {
+                    return true;
+                }
             }
         }
     }
@@ -2338,6 +2346,8 @@ export class Emitter {
                     });
                 }
                 this.writer.writeString('>');
+                if (isParam)
+                    this.writer.writeString('&');
                 break;
             case ts.SyntaxKind.FunctionType:
 
@@ -2516,8 +2526,7 @@ export class Emitter {
     }
 
     private processFunctionExpression(
-        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
+        node: FuncExpr,
         implementationMode?: boolean): boolean {
 
         this.scope.push(node);
@@ -2528,8 +2537,7 @@ export class Emitter {
     }
 
 
-    private findReturnType(node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-        | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThings) {
+    private findReturnType(node: FuncExpr, things: FuncDefThings) {
 
         let inferredTp = node.type;
         let inferredTp0:ts.Type;
@@ -2673,8 +2681,7 @@ export class Emitter {
 
 
     private processFunctionExpressionInternal(
-        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
+        node: FuncExpr,
         implementationMode?: boolean): boolean {
 
         if (implementationMode && this.isDeclare(node)) {
@@ -2808,8 +2815,12 @@ export class Emitter {
             this.writer.writeStringNewLine("// T:"+things.inferredReturnType+" Args:"+things.functionArgs+">");
             this.writer.writeStringNewLine("typedef constructor_by_args<"+things.inferredReturnType+", "+things.functionArgs+"> constructor_type");
             this.writer.EndOfStatement();
-            this.writer.writeStringNewLine("constexpr static constructor_type constructor = constructor_type()");
+            this.writer.writeStringNewLine("constexpr static constructor_type constructor_type_obj = constructor_type()");
             this.writer.EndOfStatement();
+            this.writer.writeStringNewLine("virtual function& constructor() {");
+            this.writer.writeStringNewLine("    return constructor_type_obj;");
+            this.writer.writeStringNewLine("}");
+            this.writer.writeStringNewLine();
             this.writer.writeStringNewLine();
         }
 
@@ -2817,8 +2828,7 @@ export class Emitter {
     }
 
     private processFunctionExpressionLambda(
-        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThings,
+        node: FuncExpr, things: FuncDefThings,
         implementationMode?: boolean) {
 
         if (things.isFunctionOrMethodDeclaration) {
@@ -2889,8 +2899,7 @@ export class Emitter {
     }
 
     private processFunctionExpressionParameters(
-        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThings,
+        node: FuncExpr, things: FuncDefThings,
         implementationMode?: boolean) {
 
         let defaultParams = false;
@@ -3030,9 +3039,7 @@ export class Emitter {
         }
     }
 
-    private processTemplateParams(node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-        | ts.MethodSignature | ts.ConstructorDeclaration | ts.TypeAliasDeclaration | ts.GetAccessorDeclaration
-        | ts.SetAccessorDeclaration) {
+     private processTemplateParams(node: HasTemplate) {
 
         let types = <ts.TypeParameterDeclaration[]><any>node.typeParameters;
         if (types && node.parent && (<any>node.parent).typeParameters) {
@@ -3820,9 +3827,23 @@ export class Emitter {
                 this.processExpression(node.argumentExpression);
                 this.writer.writeString(')');
             } else {
-                this.writer.writeString('[');
-                this.processExpression(node.argumentExpression);
-                this.writer.writeString(']');
+                let name:string;
+                let ow = this.writer;
+                try {
+                    this.writer = new CodeWriter();
+                    this.processExpression(node.argumentExpression);
+                    name = this.writer.getText();
+                } finally {
+                    this.writer = ow;
+                }
+                if (name === 'STR("__proto")') {
+                    this.writer.writeString(".constructor()");
+                } else {
+                    this.writer.writeString('[');
+                    this.writer.writeString(name);
+                    this.writer.writeString(']');
+                }
+    
             }
         }
     }
@@ -4351,7 +4372,7 @@ export class Emitter {
         this.writer.writeString(node.text);
 
         if (isConstructor && !this.isNewExpressionInStack) {
-            this.writer.writeString('::constructor');
+            this.writer.writeString('::constructor_type_obj');
         }
     }
 
@@ -4430,7 +4451,20 @@ export class Emitter {
                 }
             }
 
-            this.processExpression(<ts.Identifier>node.name);
+            let name:string;
+            let ow = this.writer;
+            try {
+                this.writer = new CodeWriter();
+                this.processExpression(<ts.Identifier>node.name);
+                name = this.writer.getText();
+            } finally {
+                this.writer = ow;
+            }
+            if (name === "__proto") {
+                this.writer.writeString("constructor");
+            } else {
+                this.writer.writeString(name);
+            }
 
             if (getAccess && (<any>node).__set !== true) {
                 this.writer.writeString('()');
