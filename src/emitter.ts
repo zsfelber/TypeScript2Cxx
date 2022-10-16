@@ -4411,7 +4411,13 @@ class FuncDefThings {
     isNestedFunction:boolean;
     inferredReturnType
 
-    constructor(e:Emitter,node) {
+    constructor(e:Emitter,
+        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
+        | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
+        
+        ) {
+
+
         this.isNestedFunction = node.parent && node.parent.kind === ts.SyntaxKind.Block;
         this.isClassMemberDeclaration = e.isClassMemberDeclaration(node);
         this.isClassMember = this.isClassMemberDeclaration || e.isClassMemberSignature(node);
