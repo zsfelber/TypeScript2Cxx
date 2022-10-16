@@ -2529,7 +2529,7 @@ export class Emitter {
 
 
     private findReturnType(node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-        | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThing) {
+        | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThings) {
 
         let inferredTp = node.type;
         let inferredTp0:ts.Type;
@@ -2717,7 +2717,7 @@ export class Emitter {
         // const noCapture = !this.requireCapture(node);
 
         // in case of nested function
-        let things = new FuncDefThing(this, node);
+        let things = new FuncDefThings(this, node);
 
         if (things.isNestedFunction) {
             implementationMode = true;
@@ -2801,7 +2801,7 @@ export class Emitter {
 
     private processFunctionExpressionLambda(
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThing,
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThings,
         implementationMode?: boolean) {
 
         if (things.isFunctionOrMethodDeclaration) {
@@ -2873,7 +2873,7 @@ export class Emitter {
 
     private processFunctionExpressionParameters(
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThing,
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThings,
         implementationMode?: boolean) {
 
         let defaultParams = false;
@@ -2936,7 +2936,7 @@ export class Emitter {
 
     private processFunctionExpressionConstructor(
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThing,
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThings,
         implementationMode?: boolean): number {
 
         // constructor init
@@ -4400,7 +4400,7 @@ export class Emitter {
 
 
 
-class FuncDefThing {
+class FuncDefThings {
     isClassMemberDeclaration:boolean;
     isClassMember:boolean;
     isFunctionOrMethodDeclaration:boolean;
