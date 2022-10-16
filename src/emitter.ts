@@ -289,7 +289,7 @@ export class Emitter {
         ts.forEachChild(location, checkChild);
     }
 
-    private extractReturnInfo(location: ts.Node): ReturnStatement {
+    extractReturnInfo(location: ts.Node): ReturnStatement {
         let hasReturnResult:ReturnStatement = null;
         this.childrenVisitor(location, (node: ts.Node) => {
             if (node.kind === ts.SyntaxKind.ReturnStatement) {
@@ -2534,12 +2534,6 @@ export class Emitter {
         let inferredTp = node.type;
         let inferredTp0:ts.Type;
 
-        const r = this.extractReturnInfo(node);
-        const noReturnStatement = !r;
-        const noReturn = !r || !r.hasValue();
-        const isClassMemberDeclaration = this.isClassMemberDeclaration(node);
-        const isClassMember = things.isClassMemberDeclaration || this.isClassMemberSignature(node);
-
         /*if (!inferredTp && r && r.hasValue()) {
             inferredTp = 
                 this.resolver.getOrResolveTypeOfAsTypeNode(r.returnStatement.expression);
@@ -2663,7 +2657,7 @@ export class Emitter {
                 }
             }
         } else {
-            if (noReturn) {
+            if (things.noReturn) {
                 return 'void';
             } else {
                 if (things.isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
@@ -2710,9 +2704,6 @@ export class Emitter {
             return true;
         }
 
-        const r = this.extractReturnInfo(node);
-        const noReturnStatement = !r;
-        const noReturn = !r || !r.hasValue();
         // const noParams = node.parameters.length === 0 && !this.hasArguments(node);
         // const noCapture = !this.requireCapture(node);
 
@@ -2788,7 +2779,7 @@ export class Emitter {
             });
 
             // add default return if no body
-            if (node.kind !== ts.SyntaxKind.Constructor && noReturnStatement && things.inferredReturnType != 'void') {
+            if (node.kind !== ts.SyntaxKind.Constructor && things.noReturnStatement && things.inferredReturnType != 'void') {
                 this.writer.writeString('return ');
                 this.writer.writeString(things.inferredReturnType);
                 this.writer.writeString('()');
@@ -2935,8 +2926,7 @@ export class Emitter {
     }
 
     private processFunctionExpressionConstructor(
-        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
-            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration, things: FuncDefThings,
+        node: ts.ConstructorDeclaration, things: FuncDefThings,
         implementationMode?: boolean): number {
 
         // constructor init
@@ -4409,7 +4399,10 @@ class FuncDefThings {
     isArrowFunction:boolean;
     writeAsLambdaCFunction:boolean;
     isNestedFunction:boolean;
-    inferredReturnType
+    inferredReturnType;
+    noReturnStatement:boolean;
+    noReturn:boolean;
+
 
     constructor(e:Emitter,
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
@@ -4417,7 +4410,10 @@ class FuncDefThings {
         
         ) {
 
-
+        const r = e.extractReturnInfo(node);
+        this.noReturnStatement = !r;
+        this.noReturn = !r || !r.hasValue();
+    
         this.isNestedFunction = node.parent && node.parent.kind === ts.SyntaxKind.Block;
         this.isClassMemberDeclaration = e.isClassMemberDeclaration(node);
         this.isClassMember = this.isClassMemberDeclaration || e.isClassMemberSignature(node);
