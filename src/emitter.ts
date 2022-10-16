@@ -2786,17 +2786,18 @@ export class Emitter {
                 this.writer.EndOfStatement();
             }
 
-            
-            if (node.kind === ts.SyntaxKind.Constructor && !implementationMode) {
-                things.constructorTemplAccess += ("// T:"+things.inferredReturnType+" Args:"+things.functionArgs+">\n");
-                things.constructorTemplAccess += ("typedef constructor_by_args<"+things.inferredReturnType+", "+things.functionArgs+"> constructor_type;");
-        
-                things.constructorTemplAccess;
-            }
-
-
             this.writer.EndBlock();
         }
+
+        if (node.kind === ts.SyntaxKind.Constructor && !implementationMode) {    
+            this.writer.EndOfStatement();
+            this.writer.writeStringNewLine();
+            this.writer.writeStringNewLine("// T:"+things.inferredReturnType+" Args:"+things.functionArgs+">");
+            this.writer.writeStringNewLine("typedef constructor_by_args<"+things.inferredReturnType+", "+things.functionArgs+"> constructor_type");
+            this.writer.EndOfStatement();
+            this.writer.writeStringNewLine();
+        }
+
 
     }
 
