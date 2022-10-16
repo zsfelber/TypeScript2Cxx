@@ -93,6 +93,8 @@ namespace js
 #define to_tstring ::std::to_string
 #endif
 
+#define $S std::shared_ptr
+
     typedef tmpl::number<double> number;
     typedef tmpl::object<string, any> object;
     template <typename T>
@@ -149,13 +151,13 @@ namespace js
     }
 
     template <typename I, typename T>
-    inline bool is(T *t)
+    inline bool $is(T *t)
     {
         return dynamic_cast<I *>(t) != nullptr;
     }
 
     template <typename I, typename T>
-    inline bool is(const std::shared_ptr<T> &t)
+    inline bool $is(const std::shared_ptr<T> &t)
     {
         return std::dynamic_pointer_cast<I>(t) != nullptr;
     }
@@ -167,25 +169,25 @@ namespace js
     }
 
     template <typename I, typename T>
-    inline I as(T t)
+    inline I $as(T t)
     {
         return static_cast<I>(t);
     }
 
     template <typename I, typename T>
-    inline I *as(T *t)
+    inline I *$as(T *t)
     {
         return dynamic_cast<I *>(t);
     }
 
     template <typename I, typename T, class = std::enable_if_t<!std::is_same_v<I, any>>>
-    inline std::shared_ptr<I> as(const std::shared_ptr<T> &t)
+    inline std::shared_ptr<I> $as(const std::shared_ptr<T> &t)
     {
         return std::dynamic_pointer_cast<I>(t);
     }
 
     template <typename I, typename T, class = std::enable_if_t<std::is_same_v<I, any>>>
-    inline I as(const std::shared_ptr<T> &t)
+    inline I $as(const std::shared_ptr<T> &t)
     {
         return I(t);
     }

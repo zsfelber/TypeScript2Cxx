@@ -2178,12 +2178,12 @@ export class Emitter {
                 break;
             case ts.SyntaxKind.TypeLiteral:
             case ts.SyntaxKind.ObjectLiteralExpression:
-                this.writer.writeString('std::shared_ptr<object>');
+                this.writer.writeString('$S<object>');
                 break;
             case ts.SyntaxKind.ArrayType:
                 const arrayType = <ts.ArrayTypeNode>type;
                 if (/*isParam && */!skipPointerIf) {
-                    this.writer.writeString('std::shared_ptr<');
+                    this.writer.writeString('$S<');
                 }
                 this.writer.writeString('array<');
                 if (arrayType.elementType && arrayType.elementType.kind !== ts.SyntaxKind.UndefinedKeyword) {
@@ -2236,7 +2236,7 @@ export class Emitter {
                     ;
 
                 if (!skipPointerIfA) {
-                    this.writer.writeString('std::shared_ptr<');
+                    this.writer.writeString('$S<');
                 }
 
                 // writing namespace
@@ -2327,8 +2327,9 @@ export class Emitter {
                 }
 
                 break;
-            case ts.SyntaxKind.FunctionType:
             case ts.SyntaxKind.ConstructorType:
+                this.writer.writeString('/*constructor:*/');
+            case ts.SyntaxKind.FunctionType:
 
                 const functionType = <ts.FunctionTypeNode>type;
                 this.writer.writeString('std::function<');
@@ -3874,7 +3875,7 @@ export class Emitter {
     private processBinaryExpression(node: ts.BinaryExpression): void {
         const opCode = node.operatorToken.kind;
         if (opCode === ts.SyntaxKind.InstanceOfKeyword) {
-            this.writer.writeString('is<');
+            this.writer.writeString('$is<');
 
             if (node.right.kind === ts.SyntaxKind.Identifier) {
                 const identifier = <ts.Identifier>node.right;
@@ -4098,7 +4099,7 @@ export class Emitter {
     }
 
     private processAsExpression(node: ts.AsExpression): void {
-        this.writer.writeString('as<');
+        this.writer.writeString('$as<');
         this.processType(node.type);
         this.writer.writeString('>(');
         this.processExpression(node.expression);
