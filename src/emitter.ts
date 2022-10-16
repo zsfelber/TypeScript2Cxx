@@ -1521,10 +1521,19 @@ export class Emitter {
         return hasInBase;
     }
 
+    wasCurClassConstructorInStack: boolean = false;
+
     private processClassDeclaration(node: ts.ClassDeclaration | ts.InterfaceDeclaration) {
-        this.scope.push(node);
-        this.processClassDeclarationInternal(node);
-        this.scope.pop();
+        let w:boolean;
+        try {
+            w = this.wasCurClassConstructorInStack;
+            this.wasCurClassConstructorInStack = false;
+            this.scope.push(node);
+            this.processClassDeclarationInternal(node);
+            this.scope.pop();    
+        } finally {
+            this.wasCurClassConstructorInStack = w;
+        }
     }
 
     private processClassDeclarationInternal(node: ts.ClassDeclaration | ts.InterfaceDeclaration): void {
@@ -2737,13 +2746,34 @@ export class Emitter {
         let things = new FuncDefThings(this, node);
 
         things.inferredReturnType = this.findReturnType(node, things);
-        if (node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void") {
+
+        let uninferredConstructor = 
+            node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void";
+
+        let obsoleteConstructor = 
+            this.wasCurClassConstructorInStack &&
+            uninferredConstructor;
+
+        if (obsoleteConstructor) {
 
             if (implementationMode) return true;
  
             this.writer.writeStringNewLine('// base constructor : ');
 
             this.writer.writeString('// ');
+        } else {
+            this.wasCurClassConstructorInStack = true;
+
+            if (uninferredConstructor) {
+                let ow = this.writer;
+                try {
+                    this.writer = new CodeWriter();
+                    this.writeClassName();
+                    things.inferredReturnType = this.writer.getText();
+                } finally {
+                    this.writer = ow;
+                }
+            }
         }
 
         if (things.isNestedFunction) {
@@ -2774,7 +2804,7 @@ export class Emitter {
             this.writer.writeStringNewLine(')');
         //}
 
-        if (node.kind === ts.SyntaxKind.Constructor && things.inferredReturnType==="void") {
+        if (obsoleteConstructor) {
             this.writer.writeStringNewLine();
             return true;
         }
@@ -4119,6 +4149,7 @@ export class Emitter {
         const isArray = isNew && typeOfExpression && typeOfExpression.symbol && typeOfExpression.symbol.name === 'ArrayConstructor';
 
         this.isInvokableClassRefInStack = false;
+        let invclassref = false;
 
         if (isArray) {
             this.writer.writeString('std::make_shared<');
@@ -4134,10 +4165,12 @@ export class Emitter {
                 this.processExpression(node.expression);
                 name = this.writer.getText();
             } finally {
+                invclassref = this.isInvokableClassRefInStack;
                 this.writer = ow;
                 this.isNewExpressionInStack = false;
+                this.isInvokableClassRefInStack = false;
             }
-            if (isNew && !this.isInvokableClassRefInStack) {
+            if (isNew && !invclassref) {
                 this.writer.writeString('std::make_shared<');
             }
             
@@ -4147,7 +4180,7 @@ export class Emitter {
             this.processTemplateArguments(node);
         }
 
-        if (isArray || (isNew && !this.isInvokableClassRefInStack)) {
+        if (isArray || (isNew && !invclassref)) {
             // closing template
             this.writer.writeString('>');
         }
