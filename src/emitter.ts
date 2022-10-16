@@ -4078,11 +4078,10 @@ export class Emitter {
         const typeOfExpression = isNew && this.resolver.getOrResolveTypeOf(node.expression);
         const isArray = isNew && typeOfExpression && typeOfExpression.symbol && typeOfExpression.symbol.name === 'ArrayConstructor';
 
-        if (node.kind === ts.SyntaxKind.NewExpression/* && !isArray*/) {
-            this.writer.writeString('std::make_shared<');
-        }
+        this.isConstructorInStack = false;
 
         if (isArray) {
+            this.writer.writeString('std::make_shared<');
             this.writer.writeString('array');
         } else {
 
@@ -4090,18 +4089,25 @@ export class Emitter {
             let ow = this.writer;
             try {
                 this.writer = new CodeWriter();
+                this.isNewExpressionInStack = true;
+
                 this.processExpression(node.expression);
                 name = this.writer.getText();
             } finally {
                 this.writer = ow;
+                this.isNewExpressionInStack = false;
             }
+            if (isNew && !this.isConstructorInStack) {
+                this.writer.writeString('std::make_shared<');
+            }
+            
             this.writer.writeString(name);
 
 
             this.processTemplateArguments(node);
         }
 
-        if (node.kind === ts.SyntaxKind.NewExpression/*&& !isArray*/) {
+        if (isArray || (isNew && !this.isConstructorInStack)) {
             // closing template
             this.writer.writeString('>');
         }
@@ -4291,6 +4297,10 @@ export class Emitter {
                         break;
                     case ts.SyntaxKind.TypeLiteral:
                         break;
+                    case ts.SyntaxKind.ConstructorType:
+                        if (this.isNewExpressionInStack)
+                            result = true;
+                        break;
                     case ts.SyntaxKind.TypeQuery:
                         //this.writer.writeString('/*typequery:*/');
                         result = this.shouldBeConstructorReference(node, typeInfo, type);
@@ -4303,6 +4313,9 @@ export class Emitter {
 
         return result;
     }
+
+    isNewExpressionInStack: boolean = false;
+    isConstructorInStack: boolean = false;
 
     private processIdentifier(node: ts.Identifier): void {
 
@@ -4325,7 +4338,7 @@ export class Emitter {
             }
 
             if (!nstype) {
-                isConstructor = this.resolveIsConstructorReference(node);
+                this.isConstructorInStack = isConstructor = this.resolveIsConstructorReference(node);
             }
         }
 
@@ -4337,7 +4350,7 @@ export class Emitter {
 
         this.writer.writeString(node.text);
 
-        if (isConstructor) {
+        if (isConstructor && !this.isNewExpressionInStack) {
             this.writer.writeString('::constructor');
         }
     }
