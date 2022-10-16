@@ -1916,7 +1916,7 @@ export class Emitter {
             && scopeItem.kind !== ts.SyntaxKind.ModuleDeclaration
             && scopeItem.kind !== ts.SyntaxKind.NamespaceExportDeclaration;
 
-        const forceCaptureRequired = autoAllowed && declarationList.declarations.some(d => d && (<any>d).__requireCapture);
+        //const forceCaptureRequired = autoAllowed && declarationList.declarations.some(d => d && (<any>d).__requireCapture);
         if (!((<any>declarationList).__ignore_type)) {
 
             if (forwardDeclaration) {
@@ -1928,9 +1928,9 @@ export class Emitter {
             const effectiveType = firstType || this.resolver.getOrResolveTypeOfAsTypeNode(firstInitializer);
             const useAuto = autoAllowed && !!(firstInitializer);
             this.processPredefineType(effectiveType);
-            if (!forceCaptureRequired) {
+            //if (!forceCaptureRequired) {
                 this.processType(effectiveType, useAuto);
-            } else {
+            /*} else {
                 if (useAuto) {
                     this.writer.writeString('shared');
                 } else {
@@ -1938,7 +1938,7 @@ export class Emitter {
                     this.processType(effectiveType, useAuto);
                     this.writer.writeString('>');
                 }
-            }
+            }*/
 
             this.writer.writeString(' ');
         }
@@ -1948,7 +1948,7 @@ export class Emitter {
         declarationList.declarations.forEach(d => {
                 result =
                     this.processVariableDeclarationOne(
-                        d.name, d.initializer, d.type, next, forwardDeclaration, forceCaptureRequired)
+                        d.name, d.initializer, d.type, next, forwardDeclaration/*, forceCaptureRequired*/)
                     || result;
             } );
 
@@ -1960,8 +1960,8 @@ export class Emitter {
         initializer: ts.Expression,
         type: ts.TypeNode,
         next?: { next: boolean },
-        forwardDeclaration?: boolean,
-        forceCaptureRequired?: boolean): boolean {
+        forwardDeclaration?: boolean/*,
+        forceCaptureRequired?: boolean*/): boolean {
         if (next && next.next) {
             this.writer.writeString(', ');
         }
@@ -2759,8 +2759,9 @@ export class Emitter {
                 }
 
                 // lambda or noname function
-                const byReference = (<any>node).__lambda_by_reference ? '&' : '=';
-                this.writer.writeString(`[${byReference}]`);
+                //const byReference = (<any>node).__lambda_by_reference ? '&' : '=';
+                //this.writer.writeString(`[${byReference}]`);
+                this.writer.writeString(`[&]`);
             }
         }
 
@@ -2822,11 +2823,11 @@ export class Emitter {
             next = true;
         });
 
-        if (isArrowFunction || isFunctionExpression) {
+        /*if (isArrowFunction || isFunctionExpression) {
             this.writer.writeStringNewLine(') mutable');
-        } else {
+        } else {*/
             this.writer.writeStringNewLine(')');
-        }
+        //}
 
         // constructor init
         let skipped = 0;
@@ -4101,7 +4102,8 @@ export class Emitter {
     }
 
     private processAwaitExpression(node: ts.AwaitExpression): void {
-        this.writer.writeString('std::async([=]() { ');
+        //this.writer.writeString('std::async([=]() { ');
+        this.writer.writeString('std::async([&]() { ');
         this.processExpression(node.expression);
         this.writer.writeString('; })');
     }
