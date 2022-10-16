@@ -2527,6 +2527,157 @@ export class Emitter {
         return result;
     }
 
+
+    private findReturnType(node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
+        | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration) {
+
+        let inferredTp = node.type;
+        let inferredTp0:ts.Type;
+
+        const r = this.extractReturnInfo(node);
+        const noReturnStatement = !r;
+        const noReturn = !r || !r.hasValue();
+        const isClassMemberDeclaration = this.isClassMemberDeclaration(node);
+        const isClassMember = isClassMemberDeclaration || this.isClassMemberSignature(node);
+
+        /*if (!inferredTp && r && r.hasValue()) {
+            inferredTp = 
+                this.resolver.getOrResolveTypeOfAsTypeNode(r.returnStatement.expression);
+            if (!inferredTp) {
+                console.log("Could not infer return type way 1:"+node.getText()+"  ->  "+r.returnStatement.expression.getText());
+            }
+        }*/
+            
+        const tsTypeToCsingle = (type0: ts.Type) => {
+            let tp = this.typeChecker.typeToString(type0);
+
+            switch (tp) {
+                case "true":
+                case "false":
+                case "boolean":
+                    return 1;
+                default:
+                    if (/[+-]?\d+/.test(tp)) {
+                        return 2;
+                    } else if (/[+-]?\d*[.]\d+/.test(tp)) {
+                        return 3;
+                    } else if (/[+-]?\d*[.]?\d+[eE][+-]?\d+/.test(tp)) {
+                        return 3;
+                    } else {
+                        return 0;
+                    }
+            }
+        };
+
+        const tsTypeToC = (tp: ts.Type) => {
+
+            var numtypenames=[null,  "bool","int","double"]
+            var maxch=0;
+            var minch=100000000000;
+            var utp=null;
+            var itp=null;
+            if (tp.isUnionOrIntersection() && tp.types) {
+                
+                tp.types.forEach(cht => {
+                    let tpc = tsTypeToCsingle(cht);
+
+                    if (tpc) {
+                        if (tpc>maxch) {
+                            maxch = tpc;
+                            utp = numtypenames[tpc];
+                        }
+                        if (tpc<minch) {
+                            minch = tpc;
+                            itp = numtypenames[tpc];
+                        }
+                    } else {
+                        maxch = 100000000000;
+                        utp = null;
+                    }
+                });
+            }
+            if (tp.isUnion()) {
+                return utp;
+            } else if (tp.isIntersection()) {
+                return itp;
+            } else {
+                let rtpc = tsTypeToCsingle(tp);
+                return numtypenames[rtpc];
+            }
+        };
+        if (!inferredTp) {
+            try {
+                let sign = this.typeChecker.getSignatureFromDeclaration(node);
+                if (sign) {
+                    inferredTp0 = this.typeChecker.getReturnTypeOfSignature(sign);
+                    inferredTp = this.typeChecker.typeToTypeNode(inferredTp0);
+                    /*if (!inferredTp) {
+                        console.log("Could not infer return type:" + 
+                        (node.name ? 
+                        node.name.getText() : "noname : ")
+                        +
+                        (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
+                        );
+                    }*/
+                } else {
+                    /*console.log("Could not get signature metadata so infer return type:" + 
+                    (node.name ? 
+                    node.name.getText() : "noname : ")
+                    +
+                    (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
+                    );*/
+                }
+            } catch(drop) {
+                
+            }
+        }
+
+        if (inferredTp) {
+            //let typeInfo:ts.Type;
+            //typeInfo = this.typeChecker.getTypeFromTypeNode(inferredTp);
+            //!this.resolver.isAnyLikeType(typeInfo)
+            // (ts.SyntaxKind[inferredTp.kind]);
+
+            if (node.type && this.isTemplateType(inferredTp)) {
+                return "RET";
+            } else {
+                if (!inferredTp0) {
+                    inferredTp0 = this.typeChecker.getTypeFromTypeNode(inferredTp);
+                }
+                let r0 = tsTypeToC(inferredTp0);
+                if (r0) {
+                    return r0;
+                } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
+                    return ('string');
+                } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
+                    return ('std::size_t');
+                } else {
+                    let ow = this.writer;
+                    try {
+                        this.writer = new CodeWriter();
+                        this.processType(inferredTp);
+                        return this.writer.getText();
+                    } finally {
+                        this.writer = ow;
+                    }
+                }
+            }
+        } else {
+            if (noReturn) {
+                return 'void';
+            } else {
+                if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
+                    return ('string');
+                } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
+                    return ('std::size_t');
+                } else {
+                    return ('any');
+                }
+            }
+        }
+    };
+
+
     private processFunctionExpressionInternal(
         node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
             | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
@@ -2591,217 +2742,147 @@ export class Emitter {
             this.processModifiers(node.modifiers);
         }
 
-
-        const tsTypeToCsingle = (type0: ts.Type) => {
-            let tp = this.typeChecker.typeToString(type0);
-
-            switch (tp) {
-                case "true":
-                case "false":
-                case "boolean":
-                    return 1;
-                default:
-                    if (/[+-]?\d+/.test(tp)) {
-                        return 2;
-                    } else if (/[+-]?\d*[.]\d+/.test(tp)) {
-                        return 3;
-                    } else if (/[+-]?\d*[.]?\d+[eE][+-]?\d+/.test(tp)) {
-                        return 3;
-                    } else {
-                        return 0;
-                    }
-            }
-        };
-
-        const tsTypeToC = (tp: ts.Type) => {
-
-            var numtypenames=[null,  "bool","int","double"]
-            var maxch=0;
-            var minch=100000000000;
-            var utp=null;
-            var itp=null;
-            if (tp.isUnionOrIntersection() && tp.types) {
-                
-                tp.types.forEach(cht => {
-                    let tpc = tsTypeToCsingle(cht);
-
-                    if (tpc) {
-                        if (tpc>maxch) {
-                            maxch = tpc;
-                            utp = numtypenames[tpc];
-                        }
-                        if (tpc<minch) {
-                            minch = tpc;
-                            itp = numtypenames[tpc];
-                        }
-                    } else {
-                        maxch = 100000000000;
-                        utp = null;
-                    }
-                });
-            }
-            if (tp.isUnion()) {
-                return utp;
-            } else if (tp.isIntersection()) {
-                return itp;
-            } else {
-                let rtpc = tsTypeToCsingle(tp);
-                return numtypenames[rtpc];
-            }
-        };
-
-        const findReturnType = () => {
-            let inferredTp = node.type;
-            let inferredTp0:ts.Type;
-            /*if (!inferredTp && r && r.hasValue()) {
-                inferredTp = 
-                    this.resolver.getOrResolveTypeOfAsTypeNode(r.returnStatement.expression);
-                if (!inferredTp) {
-                    console.log("Could not infer return type way 1:"+node.getText()+"  ->  "+r.returnStatement.expression.getText());
-                }
-            }*/
-            if (!inferredTp) {
-                try {
-                    let sign = this.typeChecker.getSignatureFromDeclaration(node);
-                    if (sign) {
-                        inferredTp0 = this.typeChecker.getReturnTypeOfSignature(sign);
-                        inferredTp = this.typeChecker.typeToTypeNode(inferredTp0);
-                        /*if (!inferredTp) {
-                            console.log("Could not infer return type:" + 
-                            (node.name ? 
-                            node.name.getText() : "noname : ")
-                            +
-                            (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
-                            );
-                        }*/
-                    } else {
-                        /*console.log("Could not get signature metadata so infer return type:" + 
-                        (node.name ? 
-                        node.name.getText() : "noname : ")
-                        +
-                        (r && r.hasValue() ? " .. " + r.returnStatement.getText():"")
-                        );*/
-                    }
-                } catch(drop) {
-                    
-                }
-            }
-
-            if (inferredTp) {
-                //let typeInfo:ts.Type;
-                //typeInfo = this.typeChecker.getTypeFromTypeNode(inferredTp);
-                //!this.resolver.isAnyLikeType(typeInfo)
-                // (ts.SyntaxKind[inferredTp.kind]);
-
-                if (node.type && this.isTemplateType(inferredTp)) {
-                    return "RET";
-                } else {
-                    if (!inferredTp0) {
-                        inferredTp0 = this.typeChecker.getTypeFromTypeNode(inferredTp);
-                    }
-                    let r0 = tsTypeToC(inferredTp0);
-                    if (r0) {
-                        return r0;
-                    } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
-                        return ('string');
-                    } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
-                        return ('std::size_t');
-                    } else {
-                        let ow = this.writer;
-                        try {
-                            this.writer = new CodeWriter();
-                            this.processType(inferredTp);
-                            return this.writer.getText();
-                        } finally {
-                            this.writer = ow;
-                        }
-                    }
-                }
-            } else {
-                if (noReturn) {
-                    return 'void';
-                } else {
-                    if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'toString') {
-                        return ('string');
-                    } else if (isClassMember && (<ts.Identifier>node.name) && (<ts.Identifier>node.name).text && (<ts.Identifier>node.name).text === 'length') {
-                        return ('std::size_t');
-                    } else {
-                        return ('any');
-                    }
-                }
-            }
-        };
-        let inferredReturnType = findReturnType();
+        let inferredReturnType = this.findReturnType(node);
 
         if (writeAsLambdaCFunction) {
-            if (isFunctionOrMethodDeclaration) {
-                // type declaration
-                if (node.kind !== ts.SyntaxKind.Constructor) {
-                    const isVirtual = isClassMember
-                        && !this.isStatic(node)
-                        && !this.isTemplate(<ts.MethodDeclaration>node)
-                        && implementationMode !== true;
-                    if (isVirtual) {
-                        this.writer.writeString('virtual ');
-                    }
-
-                    this.writer.writeString(inferredReturnType);
-
-                    this.writer.writeString(' ');
-                }
-
-                if (isClassMemberDeclaration && implementationMode) {
-                    // in case of constructor
-                    this.writeClassName();
-
-                    if (implementationMode
-                        && node.parent
-                        && node.parent.kind === ts.SyntaxKind.ClassDeclaration
-                        && this.isTemplate(<any>node.parent)) {
-                        this.processTemplateParameters(<any>node.parent);
-                    }
-
-                    this.writer.writeString('::');
-                }
-
-                // name
-                if (node.name && node.name.kind === ts.SyntaxKind.Identifier) {
-                    if (node.kind === ts.SyntaxKind.GetAccessor) {
-                        this.writer.writeString('get_');
-                    } else if (node.kind === ts.SyntaxKind.SetAccessor) {
-                        this.writer.writeString('set_');
-                    }
-
-                    if (node.name.kind === ts.SyntaxKind.Identifier) {
-                        this.processExpression(node.name);
-                    } else {
-                        throw new Error('Not implemented');
-                    }
-                } else {
-                    // in case of constructor
-                    this.writeClassName();
-                }
-            } else if (isArrowFunction || isFunctionExpression) {
-
-                if (isNestedFunction) {
-                    this.writer.writeString('auto ');
-                    if (node.name.kind === ts.SyntaxKind.Identifier) {
-                        this.processExpression(node.name);
-                    } else {
-                        throw new Error('Not implemented');
-                    }
-
-                    this.writer.writeString(' = ');
-                }
-
-                // lambda or noname function
-                //const byReference = (<any>node).__lambda_by_reference ? '&' : '=';
-                //this.writer.writeString(`[${byReference}]`);
-                this.writer.writeString(`[&]`);
-            }
+            this.processFunctionExpressionLambda(node, implementationMode);
         }
 
         this.writer.writeString('(');
+
+        this.processFunctionExpressionParameters(node, implementationMode);
+
+        /*if (isArrowFunction || isFunctionExpression) {
+            this.writer.writeStringNewLine(') mutable');
+        } else {*/
+            this.writer.writeStringNewLine(')');
+        //}
+
+        if (node.kind === ts.SyntaxKind.Constructor && implementationMode) {
+            this.processFunctionExpressionConstructor(node, implementationMode);
+        }
+
+        if (!implementationMode && isAbstract) {
+            // abstract
+            this.writer.cancelNewLine();
+            this.writer.writeString(' = 0');
+        }
+
+        if (!noBody && (isArrowFunction || isFunctionExpression || implementationMode)) {
+            this.writer.BeginBlock();
+
+            node.parameters
+                .filter(e => e.dotDotDotToken)
+                .forEach(element => {
+                    this.processType(element.type);
+                    this.writer.writeString(' ');
+                    this.processExpression(<ts.Identifier>element.name);
+                    this.writer.writeString(' = ');
+                    this.processType(element.type);
+                    this.writer.writeString('{');
+                    this.processExpression(<ts.Identifier>element.name);
+                    this.writer.writeStringNewLine('_...};');
+                });
+
+            if (node.kind === ts.SyntaxKind.Constructor && this.hasThisAsShared(node)) {
+                // adding header to constructor
+                this.processType(this.resolver.getOrResolveTypeOfAsTypeNode(node.parent));
+                this.writer.writeStringNewLine(' _this(this, [] (auto&) {/*to be finished*/});');
+            }
+
+            this.markRequiredCapture(node);
+            (<any>node.body).statements.filter((item, index) => index >= skipped).forEach(element => {
+                this.processStatementInternal(element, true);
+            });
+
+            // add default return if no body
+            if (node.kind !== ts.SyntaxKind.Constructor && noReturnStatement && inferredReturnType != 'void') {
+                this.writer.writeString('return ');
+                this.writer.writeString(inferredReturnType);
+                this.writer.writeString('()');
+                this.writer.EndOfStatement();
+            }
+
+            this.writer.EndBlock();
+        }
+    }
+
+    private processFunctionExpressionLambda(
+        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
+        implementationMode?: boolean) {
+
+        if (isFunctionOrMethodDeclaration) {
+            // type declaration
+            if (node.kind !== ts.SyntaxKind.Constructor) {
+                const isVirtual = isClassMember
+                    && !this.isStatic(node)
+                    && !this.isTemplate(<ts.MethodDeclaration>node)
+                    && implementationMode !== true;
+                if (isVirtual) {
+                    this.writer.writeString('virtual ');
+                }
+
+                this.writer.writeString(inferredReturnType);
+
+                this.writer.writeString(' ');
+            }
+
+            if (isClassMemberDeclaration && implementationMode) {
+                // in case of constructor
+                this.writeClassName();
+
+                if (implementationMode
+                    && node.parent
+                    && node.parent.kind === ts.SyntaxKind.ClassDeclaration
+                    && this.isTemplate(<any>node.parent)) {
+                    this.processTemplateParameters(<any>node.parent);
+                }
+
+                this.writer.writeString('::');
+            }
+
+            // name
+            if (node.name && node.name.kind === ts.SyntaxKind.Identifier) {
+                if (node.kind === ts.SyntaxKind.GetAccessor) {
+                    this.writer.writeString('get_');
+                } else if (node.kind === ts.SyntaxKind.SetAccessor) {
+                    this.writer.writeString('set_');
+                }
+
+                if (node.name.kind === ts.SyntaxKind.Identifier) {
+                    this.processExpression(node.name);
+                } else {
+                    throw new Error('Not implemented');
+                }
+            } else {
+                // in case of constructor
+                this.writeClassName();
+            }
+        } else if (isArrowFunction || isFunctionExpression) {
+
+            if (isNestedFunction) {
+                this.writer.writeString('auto ');
+                if (node.name.kind === ts.SyntaxKind.Identifier) {
+                    this.processExpression(node.name);
+                } else {
+                    throw new Error('Not implemented');
+                }
+
+                this.writer.writeString(' = ');
+            }
+
+            // lambda or noname function
+            //const byReference = (<any>node).__lambda_by_reference ? '&' : '=';
+            //this.writer.writeString(`[${byReference}]`);
+            this.writer.writeString(`[&]`);
+        }
+    }
+
+    private processFunctionExpressionParameters(
+        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
+        implementationMode?: boolean): boolean {
 
         let defaultParams = false;
         let next = false;
@@ -2858,108 +2939,64 @@ export class Emitter {
 
             next = true;
         });
+    
+    }
 
-        /*if (isArrowFunction || isFunctionExpression) {
-            this.writer.writeStringNewLine(') mutable');
-        } else {*/
-            this.writer.writeStringNewLine(')');
-        //}
+    private processFunctionExpressionConstructor(
+        node: ts.FunctionExpression | ts.ArrowFunction | ts.FunctionDeclaration | ts.MethodDeclaration
+            | ts.ConstructorDeclaration | ts.GetAccessorDeclaration | ts.SetAccessorDeclaration,
+        implementationMode?: boolean) {
 
         // constructor init
         let skipped = 0;
-        if (node.kind === ts.SyntaxKind.Constructor && implementationMode) {
-            this.writer.cancelNewLine();
 
-            next = false;
-            node.parameters
-                .filter(e => this.hasAccessModifier(e.modifiers))
-                .forEach(element => {
-                    if (next) {
-                        this.writer.writeString(', ');
-                    } else {
-                        this.writer.writeString(' : ');
-                    }
+        this.writer.cancelNewLine();
 
-                    if (element.name.kind === ts.SyntaxKind.Identifier) {
-                        this.processExpression(element.name);
-                        this.writer.writeString('(');
-                        this.processExpression(element.name);
-                        this.writer.writeString('_)');
-                    } else {
-                        throw new Error('Not implemented');
-                    }
-
-                    next = true;
-                });
-
-            // process base constructor call
-            let superCall = (<any>node.body).statements[0];
-            if (superCall && superCall.kind === ts.SyntaxKind.ExpressionStatement) {
-                superCall = (<ts.ExpressionStatement>superCall).expression;
-            }
-
-            if (superCall && superCall.kind === ts.SyntaxKind.CallExpression
-                && (<ts.CallExpression>superCall).expression.kind === ts.SyntaxKind.SuperKeyword) {
-                if (!next) {
-                    this.writer.writeString(' : ');
-                } else {
+        let next = false;
+        node.parameters
+            .filter(e => this.hasAccessModifier(e.modifiers))
+            .forEach(element => {
+                if (next) {
                     this.writer.writeString(', ');
+                } else {
+                    this.writer.writeString(' : ');
                 }
 
-                this.processExpression(superCall);
-                skipped = 1;
+                if (element.name.kind === ts.SyntaxKind.Identifier) {
+                    this.processExpression(element.name);
+                    this.writer.writeString('(');
+                    this.processExpression(element.name);
+                    this.writer.writeString('_)');
+                } else {
+                    throw new Error('Not implemented');
+                }
+
+                next = true;
+            });
+
+        // process base constructor call
+        let superCall = (<any>node.body).statements[0];
+        if (superCall && superCall.kind === ts.SyntaxKind.ExpressionStatement) {
+            superCall = (<ts.ExpressionStatement>superCall).expression;
+        }
+
+        if (superCall && superCall.kind === ts.SyntaxKind.CallExpression
+            && (<ts.CallExpression>superCall).expression.kind === ts.SyntaxKind.SuperKeyword) {
+            if (!next) {
+                this.writer.writeString(' : ');
+            } else {
+                this.writer.writeString(', ');
             }
 
-            if (next) {
-                this.writer.writeString(' ');
-            }
+            this.processExpression(superCall);
+            skipped = 1;
+        }
 
+        if (next) {
             this.writer.writeString(' ');
         }
 
-        if (!implementationMode && isAbstract) {
-            // abstract
-            this.writer.cancelNewLine();
-            this.writer.writeString(' = 0');
-        }
-
-        if (!noBody && (isArrowFunction || isFunctionExpression || implementationMode)) {
-            this.writer.BeginBlock();
-
-            node.parameters
-                .filter(e => e.dotDotDotToken)
-                .forEach(element => {
-                    this.processType(element.type);
-                    this.writer.writeString(' ');
-                    this.processExpression(<ts.Identifier>element.name);
-                    this.writer.writeString(' = ');
-                    this.processType(element.type);
-                    this.writer.writeString('{');
-                    this.processExpression(<ts.Identifier>element.name);
-                    this.writer.writeStringNewLine('_...};');
-                });
-
-            if (node.kind === ts.SyntaxKind.Constructor && this.hasThisAsShared(node)) {
-                // adding header to constructor
-                this.processType(this.resolver.getOrResolveTypeOfAsTypeNode(node.parent));
-                this.writer.writeStringNewLine(' _this(this, [] (auto&) {/*to be finished*/});');
-            }
-
-            this.markRequiredCapture(node);
-            (<any>node.body).statements.filter((item, index) => index >= skipped).forEach(element => {
-                this.processStatementInternal(element, true);
-            });
-
-            // add default return if no body
-            if (node.kind !== ts.SyntaxKind.Constructor && noReturnStatement && inferredReturnType != 'void') {
-                this.writer.writeString('return ');
-                this.writer.writeString(inferredReturnType);
-                this.writer.writeString('()');
-                this.writer.EndOfStatement();
-            }
-
-            this.writer.EndBlock();
-        }
+        this.writer.writeString(' ');
     }
 
     private writeClassName() {
@@ -4276,14 +4313,10 @@ export class Emitter {
             this.writer.writeString('_');
         }
 
-        if (isConstructor) {
-            this.writer.writeString('constructor_ref<');
-        }
-
         this.writer.writeString(node.text);
 
         if (isConstructor) {
-            this.writer.writeString('>()');
+            this.writer.writeString('::constructor');
         }
     }
 

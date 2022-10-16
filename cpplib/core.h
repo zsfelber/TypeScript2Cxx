@@ -128,6 +128,12 @@ namespace js
     };
 
     template <typename T>
+    concept is_supported = requires
+    {
+        T::IS_SUPPORTED;
+    };
+
+    template <typename T>
     concept is_object = std::is_base_of<object, T>;
 
 
@@ -1674,13 +1680,16 @@ constexpr const T const_(T t) {
         return invoke_seq_impl(f, a, Indices{});
     }
 
-    template<typename T> 
-    struct function_traits;
+    template<typename F> 
+    struct function_traits {
+        typedef F functor_type;
+    }
 
     template<typename R, typename ...Args> 
-    struct function_traits<std::function<R(Args...)>>
-    {
-        static const size_t nargs = sizeof...(Args);
+    struct function_traits_impl {
+        static constexpr const bool IS_SUPPORTED = true;
+
+        static constexpr const size_t nargs = sizeof...(Args);
 
         typedef R result_type;
 
@@ -1689,8 +1698,26 @@ constexpr const T const_(T t) {
         {
             typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
         };
+    }
 
+    template<typename R, typename ...Args> 
+    struct functype_helper {
 
+        typedef (R* builtin_functype)(Args...);
+
+        typedef std::function<R(Args...)> std_function;
+    };
+
+    template<typename R, typename ...Args> 
+    struct function_traits<typename functype_helper<R,Args...>::builtin_functype> :
+        function_traits_impl<R, Args...>
+    {
+    };
+
+    template<typename R, typename ...Args> 
+    struct function_traits<typename functype_helper<R,Args...>::std_function> :
+        function_traits_impl<R, Args...>
+    {
     };
 
     struct function
@@ -1702,7 +1729,10 @@ constexpr const T const_(T t) {
     template <typename F>
     struct function_t : function
     {
+        typedef F functor_type;
         typedef function_traits<F> traits;
+
+        static_assert(is_supported<function_traits<F>>, "unsupported functor type, should be std::function or c++ function type");
 
         F _f;
 
@@ -1717,7 +1747,7 @@ constexpr const T const_(T t) {
     };
 
     template <typename T>
-    struct constructor_ref {
+    struct class_ref : function {
 
         static_assert(std::is_base_of<object, T>::value, "return type should be derived from object");
 
@@ -1726,11 +1756,6 @@ constexpr const T const_(T t) {
             T* result = new T(args...);
             return result;
         }
-
-    };
-
-    template <typename T>
-    struct constructor : function, constructor_ref<T> {
 
         template <typename... Args>
         auto operator()(Args... args) {
@@ -1741,7 +1766,7 @@ constexpr const T const_(T t) {
     };
 
     template <typename F, typename T = typename std::result_of<F>::type, typename Tnc=typename std::remove_const<T>::type, typename Tncnp=typename std::remove_pointer<Tnc>::type>
-    struct constructor_t : function_t<F>, constructor<Tncnp>
+    struct constructor_func : function_t<F>, constructor<Tncnp>
     {
         static_assert(!std::is_same<Tnc, Tncnp>::value, "return type should be a pointer to object type");
 
@@ -1749,7 +1774,7 @@ constexpr const T const_(T t) {
     };
 
     template <typename T, typename... Args>
-    struct constructor_by_args : constructor_t<std::function<T*(Args...)>> {
+    struct constructor_by_args : constructor_func<std::function<T*(Args...)>> {
 
 
         using function_t::function_t;
@@ -2497,6 +2522,7 @@ constexpr const T const_(T t) {
             return get<object>();
         }
 
+        /*
         inline const std::shared_ptr<js::object> &class_ref() const
         {
             return get<std::shared_ptr<js::object>>();
@@ -2505,7 +2531,7 @@ constexpr const T const_(T t) {
         inline std::shared_ptr<js::object> &class_ref()
         {
             return get<std::shared_ptr<js::object>>();
-        }
+        }*/
 
         any &operator=(const any &other)
         {
@@ -3559,7 +3585,7 @@ constexpr const T const_(T t) {
     }
 
     template <typename T>
-    any constructor_t<T>::invoke(std::initializer_list<any> args_)
+    any class_ref<T>::invoke(std::initializer_list<any> args_)
     {
         auto result = invokeWithInitList(*this, args_);
         return result;
